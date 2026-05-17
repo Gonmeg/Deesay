@@ -429,10 +429,9 @@
   .tt:hover::after { opacity: 1; }
 
   /* TABLE col widths for promotion */
-  #tblTopSKU td:nth-child(2), #tblTopSKU th:nth-child(2) { min-width: 160px; max-width: 220px; white-space: normal; word-break: break-all; }
-  #tblTopSKU td:nth-child(3), #tblTopSKU th:nth-child(3) { min-width: 200px; white-space: normal; word-break: break-word; }
-  #tblTopProduct td:nth-child(2), #tblTopProduct th:nth-child(2) { min-width: 120px; max-width: 160px; white-space: normal; word-break: break-all; }
-  #tblTopProduct td:nth-child(3), #tblTopProduct th:nth-child(3) { min-width: 180px; white-space: normal; word-break: break-word; }
+  #tblTopSKU td:nth-child(3), #tblTopSKU th:nth-child(3) { min-width: 220px; white-space: normal; }
+  #tblTopProduct td:nth-child(2), #tblTopProduct th:nth-child(2) { min-width: 180px; white-space: normal; }
+  #tblTopProduct td:nth-child(3), #tblTopProduct th:nth-child(3) { min-width: 160px; white-space: normal; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text3); }
 
 </style>
 </head>
@@ -491,9 +490,9 @@
         <select id="filterChannel" onchange="onChannelChange()">
           <option value="">ทั้งหมด</option>
           <option value="Online">Online (Facebook)</option>
-          <option value="TIKTOK SHOP">TikTok Shop</option>
-          <option value="SHOPEE">Shopee</option>
-          <option value="LAZADA">Lazada</option>>
+          <option value="TikTok">TikTok</option>
+          <option value="Shopee">Shopee</option>
+          <option value="Lazada">Lazada</option>
         </select>
       </div>
       <div class="filter-group" id="subChannelGroup" style="opacity:0.35;pointer-events:none;">
