@@ -429,9 +429,10 @@
   .tt:hover::after { opacity: 1; }
 
   /* TABLE col widths for promotion */
-  #tblTopSKU td:nth-child(3), #tblTopSKU th:nth-child(3) { min-width: 220px; white-space: normal; }
-  #tblTopProduct td:nth-child(2), #tblTopProduct th:nth-child(2) { min-width: 180px; white-space: normal; }
-  #tblTopProduct td:nth-child(3), #tblTopProduct th:nth-child(3) { min-width: 160px; white-space: normal; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text3); }
+  #tblTopSKU td:nth-child(2), #tblTopSKU th:nth-child(2) { min-width: 160px; max-width: 220px; white-space: normal; word-break: break-all; }
+  #tblTopSKU td:nth-child(3), #tblTopSKU th:nth-child(3) { min-width: 200px; white-space: normal; word-break: break-word; }
+  #tblTopProduct td:nth-child(2), #tblTopProduct th:nth-child(2) { min-width: 120px; max-width: 160px; white-space: normal; word-break: break-all; }
+  #tblTopProduct td:nth-child(3), #tblTopProduct th:nth-child(3) { min-width: 180px; white-space: normal; word-break: break-word; }
 
 </style>
 </head>
@@ -1153,7 +1154,7 @@ function renderPromotion() {
     const pname = v.pname || '—';
     return `<tr>
       <td class="rank ${i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':''}">${currRank}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);" title="${k}">${k.length>22?k.substring(0,22)+'…':k}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);">${k}</td>
       <td style="color:var(--text);">${pname}</td>
       <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(v.rev)}</td>
       <td style="font-family:'IBM Plex Mono',monospace;">${fmt(v.ord)}</td>
