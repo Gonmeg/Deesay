@@ -383,7 +383,27 @@
   /* EMPTY */
   .empty { text-align: center; padding: 40px; color: var(--text3); font-size: 13px; }
 
-  /* SCROLLBAR */
+  /* AI SUMMARY */
+  .ai-summary-card { margin-top: 20px; border-color: rgba(200,169,110,0.3); }
+  .ai-summary-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .ai-icon { color: var(--accent); font-size: 16px; }
+  .ai-title { font-size: 13px; font-weight: 600; color: var(--accent); flex: 1; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .ai-summary-body {
+    font-size: 13px; color: var(--text2); line-height: 1.8;
+    white-space: pre-wrap; min-height: 60px;
+  }
+  .ai-loading {
+    display: flex; align-items: center; gap: 8px; color: var(--text3); font-size: 12px;
+  }
+  .ai-loading::before {
+    content: ''; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -515,12 +535,12 @@
         <div class="card">
           <div class="card-title">ยอดขายรวม</div>
           <div class="kpi-value" id="kpi-revenue">—</div>
-          <div class="kpi-sub"><span id="kpi-revenue-wow" class="badge-up">—</span> vs สัปดาห์ก่อน</div>
+          <div class="kpi-sub"><span id="kpi-revenue-wow" class="badge-up">—</span> vs ช่วงเดียวกันก่อนหน้า</div>
         </div>
         <div class="card">
           <div class="card-title">ออเดอร์รวม</div>
           <div class="kpi-value" id="kpi-orders">—</div>
-          <div class="kpi-sub"><span id="kpi-orders-wow" class="badge-up">—</span> vs สัปดาห์ก่อน</div>
+          <div class="kpi-sub"><span id="kpi-orders-wow" class="badge-up">—</span> vs ช่วงเดียวกันก่อนหน้า</div>
         </div>
         <div class="card">
           <div class="card-title">AOV (เฉลี่ย/ออเดอร์)</div>
@@ -554,6 +574,15 @@
         <div class="chart-wrap chart-wrap-lg">
           <canvas id="chartDailyTrend"></canvas>
         </div>
+      </div>
+
+      <div class="card ai-summary-card">
+        <div class="ai-summary-header">
+          <span class="ai-icon">✦</span>
+          <span class="ai-title">AI สรุปภาพรวมยอดขาย</span>
+          <button class="btn btn-ghost btn-sm" onclick="generateSummary('overview')">🔄 วิเคราะห์ใหม่</button>
+        </div>
+        <div class="ai-summary-body" id="ai-summary-overview">กด "วิเคราะห์ใหม่" เพื่อให้ AI สรุปข้อมูลในช่วงที่เลือก</div>
       </div>
     </div>
 
@@ -595,6 +624,14 @@
             <tbody id="tbodySubChannel"><tr><td colspan="6" class="empty">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
+      </div>
+      <div class="card ai-summary-card">
+        <div class="ai-summary-header">
+          <span class="ai-icon">✦</span>
+          <span class="ai-title">AI สรุปประสิทธิภาพช่องทาง</span>
+          <button class="btn btn-ghost btn-sm" onclick="generateSummary('channel')">🔄 วิเคราะห์ใหม่</button>
+        </div>
+        <div class="ai-summary-body" id="ai-summary-channel">กด "วิเคราะห์ใหม่" เพื่อให้ AI สรุปข้อมูลในช่วงที่เลือก</div>
       </div>
     </div>
 
@@ -646,6 +683,14 @@
           </table>
         </div>
       </div>
+      <div class="card ai-summary-card">
+        <div class="ai-summary-header">
+          <span class="ai-icon">✦</span>
+          <span class="ai-title">AI สรุป Promotion & สินค้า</span>
+          <button class="btn btn-ghost btn-sm" onclick="generateSummary('promotion')">🔄 วิเคราะห์ใหม่</button>
+        </div>
+        <div class="ai-summary-body" id="ai-summary-promotion">กด "วิเคราะห์ใหม่" เพื่อให้ AI สรุปข้อมูลในช่วงที่เลือก</div>
+      </div>
     </div>
 
     <!-- PAGE: GEO -->
@@ -687,6 +732,14 @@
             <div class="kpi-sub" id="upcountry-orders">— ออเดอร์</div>
           </div>
         </div>
+      </div>
+      <div class="card ai-summary-card">
+        <div class="ai-summary-header">
+          <span class="ai-icon">✦</span>
+          <span class="ai-title">AI สรุปภูมิศาสตร์การขาย</span>
+          <button class="btn btn-ghost btn-sm" onclick="generateSummary('geo')">🔄 วิเคราะห์ใหม่</button>
+        </div>
+        <div class="ai-summary-body" id="ai-summary-geo">กด "วิเคราะห์ใหม่" เพื่อให้ AI สรุปข้อมูลในช่วงที่เลือก</div>
       </div>
     </div>
 
@@ -1436,7 +1489,131 @@ function downloadCSV(rows, filename) {
   a.click();
 }
 
-// ===== INIT =====
+// ===== AI SUMMARY =====
+async function generateSummary(page) {
+  const el = document.getElementById('ai-summary-' + page);
+  if (!el) return;
+  el.innerHTML = '<div class="ai-loading">กำลังวิเคราะห์ข้อมูล...</div>';
+
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  const d = filteredData;
+  const totalRevenue = d.reduce((s, r) => s + (parseFloat(r.revenue)||0), 0);
+  const totalOrders = d.length;
+  const aov = totalOrders ? (totalRevenue/totalOrders).toFixed(0) : 0;
+
+  let prompt = '';
+
+  if (page === 'overview') {
+    const monthly = {};
+    d.forEach(r => {
+      const m = r.date ? r.date.substring(0,7) : 'unknown';
+      if (!monthly[m]) monthly[m] = { rev: 0, ord: 0 };
+      monthly[m].rev += parseFloat(r.revenue)||0;
+      monthly[m].ord++;
+    });
+    const monthStr = Object.entries(monthly).sort().map(([m,v]) => `${m}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
+    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
+ช่วงวันที่: ${from} ถึง ${to}
+ยอดขายรวม: ฿${Math.round(totalRevenue).toLocaleString()}
+ออเดอร์รวม: ${totalOrders.toLocaleString()}
+AOV: ฿${Number(aov).toLocaleString()}
+ยอดขายรายเดือน:
+${monthStr}
+
+สรุปภาพรวมยอดขายในช่วงนี้เป็นภาษาไทย โดย:
+1. บอกแนวโน้มโดยรวม (ขึ้น/ลง/คงที่)
+2. เดือนที่โดดเด่นที่สุดและน่าเป็นห่วงที่สุด
+3. ข้อสังเกตที่น่าสนใจ
+4. คำแนะนำสั้นๆ สำหรับทีมการตลาด
+ตอบกระชับ ไม่เกิน 5 ประโยค ใช้ bullet points`;
+  }
+
+  else if (page === 'channel') {
+    const byCh = {};
+    d.forEach(r => {
+      const k = r.channel || 'ไม่ระบุ';
+      if (!byCh[k]) byCh[k] = { rev: 0, ord: 0 };
+      byCh[k].rev += parseFloat(r.revenue)||0;
+      byCh[k].ord++;
+    });
+    const chStr = Object.entries(byCh).sort((a,b)=>b[1].rev-a[1].rev)
+      .map(([k,v]) => `${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์, ${((v.rev/totalRevenue)*100).toFixed(1)}%)`).join('\n');
+    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
+ช่วงวันที่: ${from} ถึง ${to}
+ยอดขายแยกช่องทาง:
+${chStr}
+
+สรุปประสิทธิภาพช่องทางขายเป็นภาษาไทย โดย:
+1. ช่องทางที่แข็งแกร่งที่สุดและอ่อนแอที่สุด
+2. สัดส่วนที่น่าสังเกต
+3. คำแนะนำว่าควร focus ช่องทางไหน
+ตอบกระชับ ใช้ bullet points`;
+  }
+
+  else if (page === 'promotion') {
+    const bySKU = {};
+    d.forEach(r => {
+      const k = r.product_name || r.sku_promotion || 'ไม่ระบุ';
+      if (!bySKU[k]) bySKU[k] = { rev: 0, ord: 0 };
+      bySKU[k].rev += parseFloat(r.revenue)||0;
+      bySKU[k].ord++;
+    });
+    const top10 = Object.entries(bySKU).sort((a,b)=>b[1].rev-a[1].rev).slice(0,10)
+      .map(([k,v],i) => `${i+1}. ${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
+    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
+ช่วงวันที่: ${from} ถึง ${to}
+Top 10 Promotion/สินค้า:
+${top10}
+
+สรุปภาพ Promotion เป็นภาษาไทย โดย:
+1. โปรหรือสินค้าที่ขายดีที่สุดและเหตุผลที่น่าจะเป็น
+2. Pattern ที่สังเกตได้ เช่น สินค้าที่ขายดีเป็นกลุ่ม
+3. คำแนะนำโปรที่ควร push ต่อหรือหยุด
+ตอบกระชับ ใช้ bullet points`;
+  }
+
+  else if (page === 'geo') {
+    const byProv = {};
+    d.forEach(r => {
+      const k = r.province || 'ไม่ระบุ';
+      if (!byProv[k]) byProv[k] = { rev: 0, ord: 0 };
+      byProv[k].rev += parseFloat(r.revenue)||0;
+      byProv[k].ord++;
+    });
+    const top10 = Object.entries(byProv).sort((a,b)=>b[1].rev-a[1].rev).slice(0,10)
+      .map(([k,v],i) => `${i+1}. ${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
+    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
+ช่วงวันที่: ${from} ถึง ${to}
+Top 10 จังหวัด:
+${top10}
+
+สรุปการกระจายการขายเชิงพื้นที่เป็นภาษาไทย โดย:
+1. จังหวัดหรือภูมิภาคที่แข็งแกร่ง
+2. โอกาสที่ยังไม่ได้ exploit
+3. คำแนะนำสำหรับทีมการตลาดเชิงพื้นที่
+ตอบกระชับ ใช้ bullet points`;
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'ไม่สามารถวิเคราะห์ได้';
+    el.textContent = text;
+  } catch(e) {
+    el.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
+  }
+}
+
+
 async function init() {
   try {
     setDefaultDateFilter();
