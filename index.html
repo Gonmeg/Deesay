@@ -1489,44 +1489,71 @@ function downloadCSV(rows, filename) {
   a.click();
 }
 
-// ===== AI SUMMARY =====
-async function generateSummary(page) {
+// ===== SMART SUMMARY (pure JS, no API) =====
+function generateSummary(page) {
   const el = document.getElementById('ai-summary-' + page);
   if (!el) return;
-  el.innerHTML = '<div class="ai-loading">กำลังวิเคราะห์ข้อมูล...</div>';
+  el.innerHTML = '<div class="ai-loading">กำลังวิเคราะห์...</div>';
 
   const from = document.getElementById('dateFrom').value;
   const to = document.getElementById('dateTo').value;
   const d = filteredData;
-  const totalRevenue = d.reduce((s, r) => s + (parseFloat(r.revenue)||0), 0);
-  const totalOrders = d.length;
-  const aov = totalOrders ? (totalRevenue/totalOrders).toFixed(0) : 0;
+  const prev = getPrevPeriodData();
 
-  let prompt = '';
+  const totalRev = d.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
+  const totalOrd = d.length;
+  const prevRev = prev.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
+  const prevOrd = prev.length;
+  const revChg = prevRev ? ((totalRev-prevRev)/prevRev*100).toFixed(1) : null;
+  const ordChg = prevOrd ? ((totalOrd-prevOrd)/prevOrd*100).toFixed(1) : null;
+
+  let lines = [];
 
   if (page === 'overview') {
+    // Monthly breakdown
     const monthly = {};
     d.forEach(r => {
-      const m = r.date ? r.date.substring(0,7) : 'unknown';
+      const m = r.date ? r.date.substring(0,7) : 'x';
       if (!monthly[m]) monthly[m] = { rev: 0, ord: 0 };
       monthly[m].rev += parseFloat(r.revenue)||0;
       monthly[m].ord++;
     });
-    const monthStr = Object.entries(monthly).sort().map(([m,v]) => `${m}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
-    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
-ช่วงวันที่: ${from} ถึง ${to}
-ยอดขายรวม: ฿${Math.round(totalRevenue).toLocaleString()}
-ออเดอร์รวม: ${totalOrders.toLocaleString()}
-AOV: ฿${Number(aov).toLocaleString()}
-ยอดขายรายเดือน:
-${monthStr}
+    const months = Object.entries(monthly).sort();
+    const thaiMonth = m => { const mo = parseInt(m.split('-')[1]); return ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][mo-1]; };
 
-สรุปภาพรวมยอดขายในช่วงนี้เป็นภาษาไทย โดย:
-1. บอกแนวโน้มโดยรวม (ขึ้น/ลง/คงที่)
-2. เดือนที่โดดเด่นที่สุดและน่าเป็นห่วงที่สุด
-3. ข้อสังเกตที่น่าสนใจ
-4. คำแนะนำสั้นๆ สำหรับทีมการตลาด
-ตอบกระชับ ไม่เกิน 5 ประโยค ใช้ bullet points`;
+    // Trend direction
+    if (months.length >= 2) {
+      const first = months[0][1].rev, last = months[months.length-1][1].rev;
+      const trend = last > first * 1.1 ? '📈 ขาขึ้น' : last < first * 0.9 ? '📉 ขาลง' : '➡️ ทรงตัว';
+      lines.push(`• แนวโน้มช่วงนี้: ${trend}`);
+    }
+
+    // Best/worst month
+    if (months.length > 0) {
+      const best = months.reduce((a,b) => a[1].rev > b[1].rev ? a : b);
+      const worst = months.reduce((a,b) => a[1].rev < b[1].rev ? a : b);
+      lines.push(`• เดือนที่ยอดดีที่สุด: ${thaiMonth(best[0])} (฿${fmtB(best[1].rev)})`);
+      if (months.length > 1) lines.push(`• เดือนที่ยอดต่ำที่สุด: ${thaiMonth(worst[0])} (฿${fmtB(worst[1].rev)})`);
+    }
+
+    // vs prev period
+    if (revChg !== null) {
+      const dir = parseFloat(revChg) >= 0 ? '▲ สูงขึ้น' : '▼ ลดลง';
+      lines.push(`• เทียบช่วงก่อนหน้า: ยอดขาย${dir} ${Math.abs(revChg)}%, ออเดอร์ ${parseFloat(ordChg)>=0?'▲':'▼'} ${Math.abs(ordChg)}%`);
+    }
+
+    // AOV
+    const aov = totalOrd ? (totalRev/totalOrd) : 0;
+    lines.push(`• AOV เฉลี่ย ฿${fmt(Math.round(aov))} ต่อออเดอร์`);
+
+    // Recommendation
+    if (revChg !== null && parseFloat(revChg) < -10) {
+      lines.push(`• 💡 ยอดขายลดลงมากกว่า 10% เทียบช่วงก่อน — แนะนำตรวจสอบ promotion และ channel ที่ตกเพื่อหาสาเหตุ`);
+    } else if (revChg !== null && parseFloat(revChg) > 10) {
+      lines.push(`• 💡 ยอดขายเติบโตดี — แนะนำดูว่า promotion หรือ channel ไหนที่ขับเคลื่อนการเติบโตเพื่อ scale ต่อ`);
+    } else {
+      lines.push(`• 💡 ยอดขายทรงตัว — ลองทดสอบ promotion ใหม่หรือขยายไปช่องทางที่ยังไม่แข็งแกร่ง`);
+    }
   }
 
   else if (page === 'channel') {
@@ -1537,18 +1564,21 @@ ${monthStr}
       byCh[k].rev += parseFloat(r.revenue)||0;
       byCh[k].ord++;
     });
-    const chStr = Object.entries(byCh).sort((a,b)=>b[1].rev-a[1].rev)
-      .map(([k,v]) => `${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์, ${((v.rev/totalRevenue)*100).toFixed(1)}%)`).join('\n');
-    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
-ช่วงวันที่: ${from} ถึง ${to}
-ยอดขายแยกช่องทาง:
-${chStr}
+    const sorted = Object.entries(byCh).sort((a,b)=>b[1].rev-a[1].rev);
+    const top = sorted[0], bottom = sorted[sorted.length-1];
+    if (top) lines.push(`• ช่องทางที่แข็งแกร่งที่สุด: ${top[0]} (฿${fmtB(top[1].rev)}, ${((top[1].rev/totalRev)*100).toFixed(1)}% ของยอดรวม)`);
+    if (sorted.length > 1) lines.push(`• ช่องทางที่ยอดน้อยที่สุด: ${bottom[0]} (฿${fmtB(bottom[1].rev)})`);
 
-สรุปประสิทธิภาพช่องทางขายเป็นภาษาไทย โดย:
-1. ช่องทางที่แข็งแกร่งที่สุดและอ่อนแอที่สุด
-2. สัดส่วนที่น่าสังเกต
-3. คำแนะนำว่าควร focus ช่องทางไหน
-ตอบกระชับ ใช้ bullet points`;
+    // Concentration risk
+    if (top && (top[1].rev/totalRev) > 0.6) {
+      lines.push(`• ⚠️ ยอดขายกระจุกตัวที่ ${top[0]} มากกว่า 60% — ควรพัฒนาช่องทางอื่นเพิ่มเติม`);
+    }
+    sorted.forEach(([k,v]) => {
+      lines.push(`• ${k}: ฿${fmtB(v.rev)} | ${v.ord} ออเดอร์ | AOV ฿${fmt(Math.round(v.rev/v.ord))}`);
+    });
+    if (revChg !== null) {
+      lines.push(`• เทียบช่วงก่อน: ยอดรวม ${parseFloat(revChg)>=0?'▲':'▼'} ${Math.abs(revChg)}%`);
+    }
   }
 
   else if (page === 'promotion') {
@@ -1559,18 +1589,34 @@ ${chStr}
       bySKU[k].rev += parseFloat(r.revenue)||0;
       bySKU[k].ord++;
     });
-    const top10 = Object.entries(bySKU).sort((a,b)=>b[1].rev-a[1].rev).slice(0,10)
-      .map(([k,v],i) => `${i+1}. ${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
-    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
-ช่วงวันที่: ${from} ถึง ${to}
-Top 10 Promotion/สินค้า:
-${top10}
+    const prev_bySKU = {};
+    prev.forEach(r => {
+      const k = r.product_name || r.sku_promotion || 'ไม่ระบุ';
+      if (!prev_bySKU[k]) prev_bySKU[k] = { rev: 0, ord: 0 };
+      prev_bySKU[k].rev += parseFloat(r.revenue)||0;
+    });
+    const sorted = Object.entries(bySKU).sort((a,b)=>b[1].rev-a[1].rev);
+    const top3 = sorted.slice(0,3);
+    lines.push(`• Top 3 promotion ช่วงนี้:`);
+    top3.forEach(([k,v],i) => lines.push(`  ${i+1}. ${k.length>40?k.substring(0,40)+'…':k} — ฿${fmtB(v.rev)} (${v.ord} ออเดอร์)`));
 
-สรุปภาพ Promotion เป็นภาษาไทย โดย:
-1. โปรหรือสินค้าที่ขายดีที่สุดและเหตุผลที่น่าจะเป็น
-2. Pattern ที่สังเกตได้ เช่น สินค้าที่ขายดีเป็นกลุ่ม
-3. คำแนะนำโปรที่ควร push ต่อหรือหยุด
-ตอบกระชับ ใช้ bullet points`;
+    // Rising vs falling vs new
+    const rising = [], falling = [], newPromo = [];
+    sorted.slice(0,20).forEach(([k,v]) => {
+      const p = prev_bySKU[k];
+      if (!p) newPromo.push(k.length>30?k.substring(0,30)+'…':k);
+      else if (v.rev > p.rev * 1.2) rising.push(k.length>30?k.substring(0,30)+'…':k);
+      else if (v.rev < p.rev * 0.8) falling.push(k.length>30?k.substring(0,30)+'…':k);
+    });
+    if (rising.length) lines.push(`• 📈 Promotion ที่กำลังโต: ${rising.slice(0,3).join(', ')}`);
+    if (falling.length) lines.push(`• 📉 Promotion ที่ยอดลด: ${falling.slice(0,3).join(', ')} — ควรพิจารณาปรับหรือหยุด`);
+    if (newPromo.length) lines.push(`• ✨ Promotion ใหม่ที่ไม่มีในช่วงก่อน: ${newPromo.slice(0,3).join(', ')}`);
+
+    // Top product concentration
+    if (sorted.length > 0) {
+      const topShare = (sorted[0][1].rev / totalRev * 100).toFixed(1);
+      if (parseFloat(topShare) > 20) lines.push(`• 💡 Promotion อันดับ 1 คิดเป็น ${topShare}% ของยอดรวม — ควรมี backup promotion รองรับ`);
+    }
   }
 
   else if (page === 'geo') {
@@ -1581,36 +1627,25 @@ ${top10}
       byProv[k].rev += parseFloat(r.revenue)||0;
       byProv[k].ord++;
     });
-    const top10 = Object.entries(byProv).sort((a,b)=>b[1].rev-a[1].rev).slice(0,10)
-      .map(([k,v],i) => `${i+1}. ${k}: ฿${Math.round(v.rev).toLocaleString()} (${v.ord} ออเดอร์)`).join('\n');
-    prompt = `คุณเป็นนักวิเคราะห์ข้อมูลการขายของแบรนด์เครื่องสำอางไทย "Deesay ดีเซ้ย์"
-ช่วงวันที่: ${from} ถึง ${to}
-Top 10 จังหวัด:
-${top10}
+    const sorted = Object.entries(byProv).sort((a,b)=>b[1].rev-a[1].rev);
+    const top5 = sorted.slice(0,5);
+    lines.push(`• Top 5 จังหวัด:`);
+    top5.forEach(([k,v],i) => lines.push(`  ${i+1}. ${k} — ฿${fmtB(v.rev)} (${v.ord} ออเดอร์)`));
 
-สรุปการกระจายการขายเชิงพื้นที่เป็นภาษาไทย โดย:
-1. จังหวัดหรือภูมิภาคที่แข็งแกร่ง
-2. โอกาสที่ยังไม่ได้ exploit
-3. คำแนะนำสำหรับทีมการตลาดเชิงพื้นที่
-ตอบกระชับ ใช้ bullet points`;
+    // BKK vs upcountry
+    const bkkRev = sorted.filter(([k]) => k.includes('กรุงเทพ')).reduce((s,[,v])=>s+v.rev,0);
+    const upRev = totalRev - bkkRev;
+    const bkkPct = totalRev ? (bkkRev/totalRev*100).toFixed(1) : 0;
+    lines.push(`• กรุงเทพฯ vs ต่างจังหวัด: ${bkkPct}% vs ${(100-parseFloat(bkkPct)).toFixed(1)}%`);
+
+    // High AOV provinces (opportunity)
+    const highAOV = sorted.filter(([,v]) => v.ord >= 5 && v.ord < 50).sort((a,b) => (b[1].rev/b[1].ord)-(a[1].rev/a[1].ord)).slice(0,3);
+    if (highAOV.length) lines.push(`• 💡 จังหวัดที่มี AOV สูงแต่ออเดอร์น้อย (โอกาสเติบโต): ${highAOV.map(([k,v])=>`${k} (AOV ฿${fmt(Math.round(v.rev/v.ord))})`).join(', ')}`);
   }
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    const text = data.content?.[0]?.text || 'ไม่สามารถวิเคราะห์ได้';
-    el.textContent = text;
-  } catch(e) {
-    el.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
-  }
+  setTimeout(() => {
+    el.textContent = lines.join('\n');
+  }, 300);
 }
 
 
