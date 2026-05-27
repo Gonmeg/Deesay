@@ -988,13 +988,14 @@ async function fetchAll() {
   return all;
 }
 
-async function fetchSkuAll() {
+async function fetchSkuAll(fromDate, toDate) {
   const PAGE = 1000;
   let all = [], offset = 0;
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const dateFilter = fromDate && toDate ? `&date=gte.${fromDate}&date=lte.${toDate}` : '';
   while (true) {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/sku_revenue?select=date,channel,sub_channel,order_id,parent_sku,product_name,qty,revenue_share&order=date.asc&limit=${PAGE}&offset=${offset}`,
+      `${SUPABASE_URL}/rest/v1/sku_revenue?select=date,channel,sub_channel,order_id,parent_sku,product_name,qty,revenue_share&order=date.asc${dateFilter}&limit=${PAGE}&offset=${offset}`,
       { headers }
     );
     if (!res.ok) throw new Error('SKU API error: ' + res.status);
@@ -1055,7 +1056,28 @@ function applyFilters() {
     return true;
   });
 
-  renderCurrentPage();
+  // If navigating to skurev page, re-fetch SKU data for new date range
+  if (currentPage === 'skurev') {
+    loadSkuDataAndRender(from, to, ch, sub);
+  } else {
+    renderCurrentPage();
+  }
+}
+
+async function loadSkuDataAndRender(from, to, ch, sub) {
+  const loadEl = document.getElementById('tbodySkuRev');
+  if (loadEl) loadEl.innerHTML = '<tr><td colspan="10" class="empty">กำลังโหลดข้อมูล SKU...</td></tr>';
+  try {
+    skuData = await fetchSkuAll(from, to);
+    filteredSkuData = skuData.filter(r => {
+      if (ch && r.channel !== ch) return false;
+      if (sub && r.sub_channel !== sub) return false;
+      return true;
+    });
+    renderSkuRev();
+  } catch(e) {
+    if (loadEl) loadEl.innerHTML = `<tr><td colspan="10" class="empty">โหลดข้อมูลไม่สำเร็จ: ${e.message}</td></tr>`;
+  }
 }
 
 // ===== NAVIGATION =====
@@ -1078,7 +1100,15 @@ function showPage(page) {
   document.querySelectorAll('.nav-item')[pageOrder.indexOf(page)].classList.add('active');
   document.getElementById('pageTitle').textContent = pageTitles[page];
   currentPage = page;
-  renderCurrentPage();
+  if (page === 'skurev') {
+    const from = document.getElementById('dateFrom').value;
+    const to = document.getElementById('dateTo').value;
+    const ch = document.getElementById('filterChannel').value;
+    const sub = document.getElementById('filterSubChannel').value;
+    loadSkuDataAndRender(from, to, ch, sub);
+  } else {
+    renderCurrentPage();
+  }
 }
 
 function renderCurrentPage() {
@@ -1981,13 +2011,12 @@ async function init() {
     const from = document.getElementById('dateFrom').value;
     const to = document.getElementById('dateTo').value;
 
-    // Fetch both tables in parallel
-    const [mainData, skuRawData] = await Promise.all([fetchAll(), fetchSkuAll()]);
-    allData = mainData;
-    skuData = skuRawData;
+    // Fetch only normalized_all on init (SKU data loaded on demand)
+    allData = await fetchAll();
+    skuData = [];
 
     filteredData = allData.filter(r => r.date && r.date >= from && r.date <= to);
-    filteredSkuData = skuData.filter(r => r.date && r.date >= from && r.date <= to);
+    filteredSkuData = [];
 
     const lastDate = allData.map(r => r.date).filter(Boolean).sort().reverse()[0];
     document.getElementById('lastUpdate').textContent = 'ข้อมูลล่าสุด: ' + (lastDate || '—');
