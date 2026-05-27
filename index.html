@@ -404,6 +404,15 @@
     border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
   }
 
+  /* SKU TREND SELECTOR */
+  .sku-chip {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: var(--bg3);
+    color: var(--text2); transition: all 0.15s; font-family: 'IBM Plex Mono', monospace;
+  }
+  .sku-chip.selected { color: #0a0a0f; border-color: transparent; }
+  .sku-chip:hover { opacity: 0.85; }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -833,13 +842,13 @@
       <!-- Charts Row -->
       <div class="grid-2" style="margin-bottom:20px;">
         <div class="card">
-          <div class="card-title">Top 10 SKU (ยอดขาย)</div>
+          <div class="card-title">สัดส่วนจำนวนชิ้นแยก SKU</div>
           <div class="chart-wrap chart-wrap-lg">
             <canvas id="chartSkuRevBar"></canvas>
           </div>
         </div>
         <div class="card">
-          <div class="card-title">สัดส่วนยอดขายแยก SKU</div>
+          <div class="card-title">สัดส่วนยอดขาย (฿) แยก SKU</div>
           <div class="chart-wrap chart-wrap-lg">
             <canvas id="chartSkuRevPie"></canvas>
           </div>
@@ -849,11 +858,15 @@
       <!-- Trend Chart -->
       <div class="card" style="margin-bottom:20px;">
         <div class="section-header">
-          <div class="section-title">Trend ยอดขายรายเดือนแยก SKU (Top 5)</div>
-          <select id="skurevTrendMode" onchange="renderSkuRev()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;">
-            <option value="revenue">ยอดขาย (฿)</option>
-            <option value="qty">จำนวนชิ้น</option>
-          </select>
+          <div class="section-title">Trend ยอดขายรายวันแยก SKU</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="skurevTrendMode" onchange="renderSkuTrend()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;">
+              <option value="revenue">ยอดขาย (฿)</option>
+              <option value="qty">จำนวนชิ้น</option>
+            </select>
+            <div style="font-size:11px;color:var(--text3);">เลือก SKU (สูงสุด 5):</div>
+            <div id="skuTrendSelector" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
         </div>
         <div class="chart-wrap chart-wrap-lg">
           <canvas id="chartSkuTrend"></canvas>
@@ -1728,63 +1741,50 @@ function renderSkuRev() {
   const qEl = document.getElementById('skurev-qty-cmp');
   qEl.textContent = qCmp.text; qEl.className = qCmp.cls;
 
-  // Sort
+  // Sort by revenue
   const sorted = Object.entries(bySKU).sort((a,b) => b[1].rev - a[1].rev);
 
-  // Bar Chart - Top 10
-  const top10 = sorted.slice(0,10);
-  makeChart('chartSkuRevBar', 'bar',
-    top10.map(([k]) => k),
-    [{
-      label: 'ยอดขาย (฿)',
-      data: top10.map(([,v]) => v.rev),
-      backgroundColor: COLORS,
-      borderRadius: 4
-    }],
-    { indexAxis: 'y' }
-  );
-
-  // Pie Chart
-  const top8 = sorted.slice(0,8);
-  const otherRev = sorted.slice(8).reduce((s,[,v]) => s+v.rev, 0);
-  const pieLabels = [...top8.map(([k]) => k), ...(otherRev > 0 ? ['อื่นๆ'] : [])];
-  const pieData = [...top8.map(([,v]) => v.rev), ...(otherRev > 0 ? [otherRev] : [])];
-  makeChart('chartSkuRevPie', 'doughnut', pieLabels, [{
-    data: pieData,
+  // Chart Left: Pie - จำนวนชิ้น
+  const top8qty = [...Object.entries(bySKU)].sort((a,b)=>b[1].qty-a[1].qty).slice(0,8);
+  const otherQty = Object.entries(bySKU).sort((a,b)=>b[1].qty-a[1].qty).slice(8).reduce((s,[,v])=>s+v.qty,0);
+  const qtyPieLabels = [...top8qty.map(([k,v]) => `${k} (${((v.qty/totalQty)*100).toFixed(1)}%)`), ...(otherQty>0?[`อื่นๆ (${((otherQty/totalQty)*100).toFixed(1)}%)`]:[])];
+  const qtyPieData = [...top8qty.map(([,v])=>v.qty), ...(otherQty>0?[otherQty]:[])];
+  makeChart('chartSkuRevBar', 'doughnut', qtyPieLabels, [{
+    data: qtyPieData,
     backgroundColor: [...COLORS, '#4a4a6a'],
     borderWidth: 0
   }]);
 
-  // Trend Chart - Top 5 by revenue
-  const top5SKUs = sorted.slice(0,5).map(([k]) => k);
-  const monthsSet = new Set(d.map(r => r.date ? r.date.substring(0,7) : null).filter(Boolean));
-  const months = [...monthsSet].sort();
-  const thaiMo = m => { const mo = parseInt(m.split('-')[1]); return ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][mo-1]; };
-  const trendMode = document.getElementById('skurevTrendMode')?.value || 'revenue';
+  // Chart Right: Pie - ยอดขาย พร้อม %
+  const top8rev = sorted.slice(0,8);
+  const otherRev = sorted.slice(8).reduce((s,[,v])=>s+v.rev,0);
+  const revPieLabels = [...top8rev.map(([k,v]) => `${k} (${((v.rev/totalRev)*100).toFixed(1)}%)`), ...(otherRev>0?[`อื่นๆ (${((otherRev/totalRev)*100).toFixed(1)}%)`]:[])];
+  const revPieData = [...top8rev.map(([,v])=>v.rev), ...(otherRev>0?[otherRev]:[])];
+  makeChart('chartSkuRevPie', 'doughnut', revPieLabels, [{
+    data: revPieData,
+    backgroundColor: [...COLORS, '#4a4a6a'],
+    borderWidth: 0
+  }]);
 
-  const trendData = {};
-  d.forEach(r => {
-    const k = r.parent_sku || '—';
-    if (!top5SKUs.includes(k)) return;
-    const m = r.date ? r.date.substring(0,7) : 'x';
-    if (!trendData[k]) trendData[k] = {};
-    if (!trendData[k][m]) trendData[k][m] = { rev: 0, qty: 0 };
-    trendData[k][m].rev += parseFloat(r.revenue_share)||0;
-    trendData[k][m].qty += parseFloat(r.qty)||0;
-  });
+  // Build SKU selector chips (Top 10)
+  const top10SKUs = sorted.slice(0,10).map(([k])=>k);
+  window._skuTrendAllData = d;
+  window._skuTrendSorted = sorted;
 
-  const trendDatasets = top5SKUs.map((sku, i) => ({
-    label: sku,
-    data: months.map(m => trendData[sku]?.[m]?.[trendMode === 'revenue' ? 'rev' : 'qty'] || 0),
-    borderColor: COLORS[i],
-    backgroundColor: COLORS[i] + '20',
-    borderWidth: 2,
-    pointRadius: 3,
-    tension: 0.3,
-    fill: false
-  }));
+  // Always reset selected SKUs to top 5 of current data
+  window._selectedSKUs = top10SKUs.slice(0, 5);
 
-  makeChart('chartSkuTrend', 'line', months.map(thaiMo), trendDatasets);
+  const selector = document.getElementById('skuTrendSelector');
+  if (selector) {
+    selector.innerHTML = top10SKUs.map((sku, i) => {
+      const isSelected = window._selectedSKUs.includes(sku);
+      return `<span class="sku-chip ${isSelected?'selected':''}"
+        style="${isSelected?`background:${COLORS[window._selectedSKUs.indexOf(sku)]};`:''}"
+        onclick="toggleSkuChip('${sku}')">${sku}</span>`;
+    }).join('');
+  }
+
+  renderSkuTrend();
 
   // Store for table render
   window._skuSorted = sorted;
@@ -1796,8 +1796,64 @@ function renderSkuRev() {
   renderSkuRevTable();
 }
 
+function toggleSkuChip(sku) {
+  if (!window._selectedSKUs) window._selectedSKUs = [];
+  const idx = window._selectedSKUs.indexOf(sku);
+  if (idx >= 0) {
+    if (window._selectedSKUs.length > 1) window._selectedSKUs.splice(idx, 1);
+  } else {
+    if (window._selectedSKUs.length < 5) window._selectedSKUs.push(sku);
+  }
+  // Re-render chips
+  const sorted = window._skuTrendSorted || [];
+  const top10SKUs = sorted.slice(0,10).map(([k])=>k);
+  const selector = document.getElementById('skuTrendSelector');
+  if (selector) {
+    selector.innerHTML = top10SKUs.map((s, i) => {
+      const isSelected = window._selectedSKUs.includes(s);
+      return `<span class="sku-chip ${isSelected?'selected':''}"
+        style="${isSelected?`background:${COLORS[window._selectedSKUs.indexOf(s)]};`:''}"
+        onclick="toggleSkuChip('${s}')">${s}</span>`;
+    }).join('');
+  }
+  renderSkuTrend();
+}
+
+function renderSkuTrend() {
+  const d = window._skuTrendAllData || filteredSkuData;
+  const selectedSKUs = window._selectedSKUs || [];
+  const trendMode = document.getElementById('skurevTrendMode')?.value || 'revenue';
+
+  // Group by date (daily)
+  const trendData = {};
+  d.forEach(r => {
+    const k = r.parent_sku || '—';
+    if (!selectedSKUs.includes(k)) return;
+    const day = r.date || 'x';
+    if (!trendData[k]) trendData[k] = {};
+    if (!trendData[k][day]) trendData[k][day] = { rev: 0, qty: 0 };
+    trendData[k][day].rev += parseFloat(r.revenue_share)||0;
+    trendData[k][day].qty += parseFloat(r.qty)||0;
+  });
+
+  const daysSet = new Set(d.map(r => r.date).filter(Boolean));
+  const days = [...daysSet].sort();
+
+  const datasets = selectedSKUs.map((sku, i) => ({
+    label: sku,
+    data: days.map(day => trendData[sku]?.[day]?.[trendMode === 'revenue' ? 'rev' : 'qty'] || 0),
+    borderColor: COLORS[i],
+    backgroundColor: COLORS[i] + '20',
+    borderWidth: 2,
+    pointRadius: days.length > 60 ? 0 : 2,
+    tension: 0.3,
+    fill: false
+  }));
+
+  makeChart('chartSkuTrend', 'line', days, datasets);
+}
+
 function renderSkuRevTable() {
-  const sorted = window._skuSorted || [];
   const prevBySKU = window._skuPrevBySKU || {};
   const prevRankMap = window._skuPrevRankMap || {};
   const totalRev = window._skuTotalRev || 1;
