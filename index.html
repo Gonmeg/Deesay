@@ -566,6 +566,20 @@
         </div>
       </div>
 
+      <!-- ยอดตีกลับ -->
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="card" style="border-color:rgba(248,113,113,0.3);background:rgba(248,113,113,0.04);">
+          <div class="card-title" style="color:var(--red);">ยอดตีกลับ / ยังไม่รับเงิน</div>
+          <div class="kpi-value" id="kpi-unsettled-rev" style="color:var(--red);">—</div>
+          <div class="kpi-sub" id="kpi-unsettled-orders">— ออเดอร์ที่ยังไม่ settled</div>
+        </div>
+        <div class="card" style="border-color:rgba(248,113,113,0.3);background:rgba(248,113,113,0.04);">
+          <div class="card-title">สัดส่วนตีกลับ</div>
+          <div class="kpi-value" id="kpi-unsettled-pct" style="color:var(--red);">—</div>
+          <div class="kpi-sub">% ของยอดรวมทั้งหมด (รวมตีกลับ)</div>
+        </div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
           <div class="card-title">ยอดขายรายเดือน</div>
@@ -994,7 +1008,7 @@ async function fetchAll() {
 
   while (true) {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/normalized_all?select=date,channel,sub_channel,order_id,customer_name,phone,province,sku_promotion,product_name,revenue&order=date.asc&limit=${PAGE}&offset=${offset}`,
+      `${SUPABASE_URL}/rest/v1/normalized_all?select=date,channel,sub_channel,order_id,customer_name,phone,province,sku_promotion,product_name,revenue,settled&order=date.asc&limit=${PAGE}&offset=${offset}`,
       { headers }
     );
     if (!res.ok) throw new Error('API error: ' + res.status);
@@ -1004,6 +1018,45 @@ async function fetchAll() {
     offset += PAGE;
   }
   return all;
+}
+
+// ===== SETTLED FILTER LOGIC =====
+// เดือนปัจจุบัน + 7 วันแรกของเดือนถัดไป → เอาทุก order
+// เกินนั้น → เอาเฉพาะ settled = true
+function getSettledCutoff() {
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11
+  const currentYear = now.getFullYear();
+  // 7 วันแรกของเดือนถัดไป
+  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+  const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+  const cutoff = new Date(nextMonthYear, nextMonth, 7);
+  return cutoff;
+}
+
+function shouldIncludeRow(r) {
+  if (!r.date) return false;
+  const rowDate = new Date(r.date);
+  const now = new Date();
+  const cutoff = getSettledCutoff();
+
+  // ถ้าตอนนี้อยู่ใน 7 วันแรกของเดือนใหม่ → เดือนปัจจุบันและก่อนหน้าให้ filter settled
+  // ถ้าตอนนี้เกิน 7 วันแรกของเดือนใหม่ → เดือนปัจจุบันไม่ filter settled
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  if (rowDate >= currentMonthStart) {
+    // เดือนปัจจุบัน → เอาทุก order เสมอ
+    return true;
+  } else if (now <= cutoff) {
+    // อยู่ใน 7 วันแรกของเดือนใหม่ → เดือนก่อนหน้าเอาทุก order ด้วย
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    if (rowDate >= prevMonthStart) return true;
+    // เดือนก่อนหน้านั้น → settled = true เท่านั้น
+    return r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+  } else {
+    // เกิน 7 วันแรก → เดือนก่อนๆ ต้อง settled = true
+    return r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+  }
 }
 
 async function fetchSkuAll(fromDate, toDate) {
@@ -1063,6 +1116,7 @@ function applyFilters() {
     if (to && r.date > to) return false;
     if (ch && r.channel !== ch) return false;
     if (sub && r.sub_channel !== sub) return false;
+    if (!shouldIncludeRow(r)) return false;
     return true;
   });
 
@@ -1254,6 +1308,30 @@ function renderOverview() {
   rwow.textContent = rCmp.text; rwow.className = rCmp.cls;
   const owow = document.getElementById('kpi-orders-wow');
   owow.textContent = oCmp.text; owow.className = oCmp.cls;
+
+  // คำนวณยอดตีกลับ — จาก allData ที่ filter date แต่ไม่ filter settled
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  const ch = document.getElementById('filterChannel').value;
+  const sub = document.getElementById('filterSubChannel').value;
+  const allInRange = allData.filter(r => {
+    if (!r.date || r.date < from || r.date > to) return false;
+    if (ch && r.channel !== ch) return false;
+    if (sub && r.sub_channel !== sub) return false;
+    return true;
+  });
+  const unsettled = allInRange.filter(r => {
+    const isSettled = r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+    return !isSettled && !shouldIncludeRow(r); // เฉพาะแถวที่ถูก exclude ออกไปจาก shouldIncludeRow
+  });
+  const unsettledRev = unsettled.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
+  const unsettledOrd = unsettled.length;
+  const totalWithUnsettled = allInRange.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
+  const unsettledPct = totalWithUnsettled ? ((unsettledRev/totalWithUnsettled)*100).toFixed(1) : '0.0';
+
+  document.getElementById('kpi-unsettled-rev').textContent = fmtB(unsettledRev);
+  document.getElementById('kpi-unsettled-orders').textContent = `${fmt(unsettledOrd)} ออเดอร์ที่ยังไม่ settled`;
+  document.getElementById('kpi-unsettled-pct').textContent = unsettledPct + '%';
 
   // Monthly
   const monthly = {};
@@ -2147,7 +2225,7 @@ async function init() {
     allData = await fetchAll();
     skuData = [];
 
-    filteredData = allData.filter(r => r.date && r.date >= from && r.date <= to);
+    filteredData = allData.filter(r => r.date && r.date >= from && r.date <= to && shouldIncludeRow(r));
     filteredSkuData = [];
 
     const lastDate = allData.map(r => r.date).filter(Boolean).sort().reverse()[0];
