@@ -513,9 +513,9 @@
         <select id="filterChannel" onchange="onChannelChange()">
           <option value="">ทั้งหมด</option>
           <option value="Online">Online (Facebook)</option>
-          <option value="TikTok">TikTok</option>
-          <option value="Shopee">Shopee</option>
-          <option value="Lazada">Lazada</option>
+          <option value="TIKTOK SHOP">TikTok Shop</option>
+          <option value="SHOPEE">Shopee</option>
+          <option value="LAZADA">Lazada</option>
         </select>
       </div>
       <div class="filter-group" id="subChannelGroup" style="opacity:0.35;pointer-events:none;">
@@ -1684,6 +1684,13 @@ function getSkuPrevPeriod() {
 
 function renderSkuRev() {
   const d = filteredSkuData;
+
+  // Show loading if no data yet
+  if (!d || d.length === 0) {
+    document.getElementById('tbodySkuRev').innerHTML = '<tr><td colspan="10" class="empty">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>';
+    return;
+  }
+
   const prev = getSkuPrevPeriod();
 
   // Aggregate by SKU
