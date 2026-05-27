@@ -865,6 +865,11 @@
               <option value="qty">จำนวนชิ้น</option>
             </select>
             <div style="font-size:11px;color:var(--text3);">เลือก SKU (สูงสุด 5):</div>
+            <div style="position:relative;">
+              <input type="text" id="skuSearchInput" placeholder="พิมพ์ค้นหา SKU..." oninput="filterSkuDropdown()" onfocus="showSkuDropdown()" onblur="setTimeout(hideSkuDropdown,200)"
+                style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px;width:160px;font-family:'IBM Plex Mono',monospace;">
+              <div id="skuDropdownList" style="display:none;position:absolute;top:100%;left:0;background:var(--bg2);border:1px solid var(--border);border-radius:6px;min-width:200px;max-height:200px;overflow-y:auto;z-index:999;margin-top:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+            </div>
             <div id="skuTrendSelector" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           </div>
         </div>
@@ -1744,45 +1749,60 @@ function renderSkuRev() {
   // Sort by revenue
   const sorted = Object.entries(bySKU).sort((a,b) => b[1].rev - a[1].rev);
 
-  // Chart Left: Pie - จำนวนชิ้น
-  const top8qty = [...Object.entries(bySKU)].sort((a,b)=>b[1].qty-a[1].qty).slice(0,8);
-  const otherQty = Object.entries(bySKU).sort((a,b)=>b[1].qty-a[1].qty).slice(8).reduce((s,[,v])=>s+v.qty,0);
-  const qtyPieLabels = [...top8qty.map(([k,v]) => `${k} (${((v.qty/totalQty)*100).toFixed(1)}%)`), ...(otherQty>0?[`อื่นๆ (${((otherQty/totalQty)*100).toFixed(1)}%)`]:[])];
+  // Chart Left: Pie - จำนวนชิ้น (tooltip shows %)
+  const sortedByQty = [...Object.entries(bySKU)].sort((a,b)=>b[1].qty-a[1].qty);
+  const top8qty = sortedByQty.slice(0,8);
+  const otherQty = sortedByQty.slice(8).reduce((s,[,v])=>s+v.qty,0);
+  const qtyPieLabels = [...top8qty.map(([k])=>k), ...(otherQty>0?['อื่นๆ']:[])];
   const qtyPieData = [...top8qty.map(([,v])=>v.qty), ...(otherQty>0?[otherQty]:[])];
-  makeChart('chartSkuRevBar', 'doughnut', qtyPieLabels, [{
-    data: qtyPieData,
-    backgroundColor: [...COLORS, '#4a4a6a'],
-    borderWidth: 0
-  }]);
+  if(charts['chartSkuRevBar']) charts['chartSkuRevBar'].destroy();
+  const ctxBar = document.getElementById('chartSkuRevBar');
+  if(ctxBar) {
+    charts['chartSkuRevBar'] = new Chart(ctxBar, {
+      type: 'doughnut',
+      data: { labels: qtyPieLabels, datasets: [{ data: qtyPieData, backgroundColor: [...COLORS,'#4a4a6a'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color:'#9090a8', font:{ family:'Sarabun', size:11 }, boxWidth:12 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} ชิ้น (${((ctx.raw/totalQty)*100).toFixed(1)}%)` } }
+        }
+      }
+    });
+  }
 
-  // Chart Right: Pie - ยอดขาย พร้อม %
+  // Chart Right: Pie - ยอดขาย (tooltip shows %)
   const top8rev = sorted.slice(0,8);
   const otherRev = sorted.slice(8).reduce((s,[,v])=>s+v.rev,0);
-  const revPieLabels = [...top8rev.map(([k,v]) => `${k} (${((v.rev/totalRev)*100).toFixed(1)}%)`), ...(otherRev>0?[`อื่นๆ (${((otherRev/totalRev)*100).toFixed(1)}%)`]:[])];
+  const revPieLabels = [...top8rev.map(([k])=>k), ...(otherRev>0?['อื่นๆ']:[])];
   const revPieData = [...top8rev.map(([,v])=>v.rev), ...(otherRev>0?[otherRev]:[])];
-  makeChart('chartSkuRevPie', 'doughnut', revPieLabels, [{
-    data: revPieData,
-    backgroundColor: [...COLORS, '#4a4a6a'],
-    borderWidth: 0
-  }]);
+  if(charts['chartSkuRevPie']) charts['chartSkuRevPie'].destroy();
+  const ctxPie = document.getElementById('chartSkuRevPie');
+  if(ctxPie) {
+    charts['chartSkuRevPie'] = new Chart(ctxPie, {
+      type: 'doughnut',
+      data: { labels: revPieLabels, datasets: [{ data: revPieData, backgroundColor: [...COLORS,'#4a4a6a'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color:'#9090a8', font:{ family:'Sarabun', size:11 }, boxWidth:12 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ฿${fmt(Math.round(ctx.raw))} (${((ctx.raw/totalRev)*100).toFixed(1)}%)` } }
+        }
+      }
+    });
+  }
 
-  // Build SKU selector chips (Top 10)
-  const top10SKUs = sorted.slice(0,10).map(([k])=>k);
+  // Build SKU selector — ALL SKUs searchable
+  const allSKUs = sorted.map(([k])=>k);
+  window._skuAllSKUs = allSKUs;
   window._skuTrendAllData = d;
   window._skuTrendSorted = sorted;
 
-  // Always reset selected SKUs to top 5 of current data
-  window._selectedSKUs = top10SKUs.slice(0, 5);
+  // Always reset selected SKUs to top 5
+  window._selectedSKUs = allSKUs.slice(0, 5);
 
-  const selector = document.getElementById('skuTrendSelector');
-  if (selector) {
-    selector.innerHTML = top10SKUs.map((sku, i) => {
-      const isSelected = window._selectedSKUs.includes(sku);
-      return `<span class="sku-chip ${isSelected?'selected':''}"
-        style="${isSelected?`background:${COLORS[window._selectedSKUs.indexOf(sku)]};`:''}"
-        onclick="toggleSkuChip('${sku}')">${sku}</span>`;
-    }).join('');
-  }
+  renderSkuChips();
+  renderSkuDropdown('');
 
   renderSkuTrend();
 
@@ -1796,27 +1816,67 @@ function renderSkuRev() {
   renderSkuRevTable();
 }
 
-function toggleSkuChip(sku) {
-  if (!window._selectedSKUs) window._selectedSKUs = [];
-  const idx = window._selectedSKUs.indexOf(sku);
-  if (idx >= 0) {
-    if (window._selectedSKUs.length > 1) window._selectedSKUs.splice(idx, 1);
-  } else {
-    if (window._selectedSKUs.length < 5) window._selectedSKUs.push(sku);
-  }
-  // Re-render chips
-  const sorted = window._skuTrendSorted || [];
-  const top10SKUs = sorted.slice(0,10).map(([k])=>k);
+function renderSkuChips() {
   const selector = document.getElementById('skuTrendSelector');
-  if (selector) {
-    selector.innerHTML = top10SKUs.map((s, i) => {
-      const isSelected = window._selectedSKUs.includes(s);
-      return `<span class="sku-chip ${isSelected?'selected':''}"
-        style="${isSelected?`background:${COLORS[window._selectedSKUs.indexOf(s)]};`:''}"
-        onclick="toggleSkuChip('${s}')">${s}</span>`;
-    }).join('');
-  }
+  if (!selector) return;
+  const selected = window._selectedSKUs || [];
+  selector.innerHTML = selected.map((sku, i) => `
+    <span class="sku-chip selected" style="background:${COLORS[i]};" onclick="removeSkuChip('${sku}')">
+      ${sku} ✕
+    </span>`).join('');
+}
+
+function renderSkuDropdown(query) {
+  const list = document.getElementById('skuDropdownList');
+  if (!list) return;
+  const all = window._skuAllSKUs || [];
+  const selected = window._selectedSKUs || [];
+  const filtered = all.filter(s => s.toLowerCase().includes(query.toLowerCase()) && !selected.includes(s));
+  list.innerHTML = filtered.slice(0,20).map(sku => `
+    <div onclick="addSkuChip('${sku}')" style="padding:7px 12px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text2);border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${sku}</div>`).join('') ||
+    '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">ไม่พบ SKU</div>';
+}
+
+function filterSkuDropdown() {
+  const q = document.getElementById('skuSearchInput')?.value || '';
+  showSkuDropdown();
+  renderSkuDropdown(q);
+}
+
+function showSkuDropdown() {
+  const list = document.getElementById('skuDropdownList');
+  if (list) list.style.display = 'block';
+}
+
+function hideSkuDropdown() {
+  const list = document.getElementById('skuDropdownList');
+  if (list) list.style.display = 'none';
+}
+
+function addSkuChip(sku) {
+  if (!window._selectedSKUs) window._selectedSKUs = [];
+  if (window._selectedSKUs.length >= 5 || window._selectedSKUs.includes(sku)) return;
+  window._selectedSKUs.push(sku);
+  const inp = document.getElementById('skuSearchInput');
+  if (inp) inp.value = '';
+  renderSkuChips();
+  renderSkuDropdown('');
   renderSkuTrend();
+}
+
+function removeSkuChip(sku) {
+  if (!window._selectedSKUs) return;
+  if (window._selectedSKUs.length <= 1) return;
+  window._selectedSKUs = window._selectedSKUs.filter(s => s !== sku);
+  renderSkuChips();
+  renderSkuTrend();
+}
+
+function toggleSkuChip(sku) {
+  const idx = (window._selectedSKUs||[]).indexOf(sku);
+  if (idx >= 0) removeSkuChip(sku);
+  else addSkuChip(sku);
 }
 
 function renderSkuTrend() {
@@ -1854,6 +1914,7 @@ function renderSkuTrend() {
 }
 
 function renderSkuRevTable() {
+  const sorted = window._skuSorted || [];
   const prevBySKU = window._skuPrevBySKU || {};
   const prevRankMap = window._skuPrevRankMap || {};
   const totalRev = window._skuTotalRev || 1;
