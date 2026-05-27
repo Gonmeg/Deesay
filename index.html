@@ -1068,12 +1068,30 @@ async function loadSkuDataAndRender(from, to, ch, sub) {
   const loadEl = document.getElementById('tbodySkuRev');
   if (loadEl) loadEl.innerHTML = '<tr><td colspan="10" class="empty">กำลังโหลดข้อมูล SKU...</td></tr>';
   try {
-    skuData = await fetchSkuAll(from, to);
+    // Calculate prev period
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    const diffMs = toDate - fromDate + 86400000;
+    const prevTo = new Date(fromDate - 86400000);
+    const prevFrom = new Date(prevTo - diffMs + 86400000);
+    const prevFromStr = prevFrom.toISOString().substring(0,10);
+    const prevToStr = prevTo.toISOString().substring(0,10);
+
+    // Fetch current and prev period in parallel
+    const [currData, prevData] = await Promise.all([
+      fetchSkuAll(from, to),
+      fetchSkuAll(prevFromStr, prevToStr)
+    ]);
+
+    skuData = currData;
+    window._skuPrevData = prevData;
+
     filteredSkuData = skuData.filter(r => {
       if (ch && r.channel !== ch) return false;
       if (sub && r.sub_channel !== sub) return false;
       return true;
     });
+
     renderSkuRev();
   } catch(e) {
     if (loadEl) loadEl.innerHTML = `<tr><td colspan="10" class="empty">โหลดข้อมูลไม่สำเร็จ: ${e.message}</td></tr>`;
@@ -1654,20 +1672,10 @@ function downloadCSV(rows, filename) {
 
 // ===== SKU REVENUE =====
 function getSkuPrevPeriod() {
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
-  if (!from || !to) return [];
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-  const diffMs = toDate - fromDate + 86400000;
-  const prevTo = new Date(fromDate - 86400000);
-  const prevFrom = new Date(prevTo - diffMs + 86400000);
-  const pf = prevFrom.toISOString().substring(0,10);
-  const pt = prevTo.toISOString().substring(0,10);
   const ch = document.getElementById('filterChannel').value;
   const sub = document.getElementById('filterSubChannel').value;
-  return skuData.filter(r => {
-    if (!r.date || r.date < pf || r.date > pt) return false;
+  const prevData = window._skuPrevData || [];
+  return prevData.filter(r => {
     if (ch && r.channel !== ch) return false;
     if (sub && r.sub_channel !== sub) return false;
     return true;
