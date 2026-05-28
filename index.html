@@ -1052,10 +1052,10 @@ function shouldIncludeRow(r) {
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     if (rowDate >= prevMonthStart) return true;
     // เดือนก่อนหน้านั้น → settled = true เท่านั้น
-    return r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+    return String(r.settled).toLowerCase() === 'true';
   } else {
     // เกิน 7 วันแรก → เดือนก่อนๆ ต้อง settled = true
-    return r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+    return String(r.settled).toLowerCase() === 'true';
   }
 }
 
@@ -1321,7 +1321,7 @@ function renderOverview() {
     return true;
   });
   const unsettled = allInRange.filter(r => {
-    const isSettled = r.settled === true || r.settled === 'true' || r.settled === 'TRUE';
+    const isSettled = String(r.settled).toLowerCase() === 'true';
     return !isSettled && !shouldIncludeRow(r); // เฉพาะแถวที่ถูก exclude ออกไปจาก shouldIncludeRow
   });
   const unsettledRev = unsettled.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
