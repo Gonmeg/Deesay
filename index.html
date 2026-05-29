@@ -1002,12 +1002,20 @@
         <div class="card" style="margin-bottom:20px;">
           <div class="section-header">
             <div class="section-title">Top Promotion ที่มี SKU นี้ แยกตามช่องทาง</div>
-            <button class="btn btn-ghost" onclick="exportTable('tblSkuAnalysisPromo')">⬇ Export</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:11px;color:var(--text3);">เรียงตาม:</span>
+              <select id="skuPromoSortMode" onchange="renderSkuAnalysisPromo()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;">
+                <option value="revenue">ยอดขาย (฿)</option>
+                <option value="orders">ออเดอร์</option>
+                <option value="qty">จำนวนชิ้น</option>
+              </select>
+              <button class="btn btn-ghost" onclick="exportTable('tblSkuAnalysisPromo')">⬇ Export</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table id="tblSkuAnalysisPromo">
               <thead>
-                <tr><th>Channel</th><th>Promotion (SKU)</th><th>ชื่อสินค้า (ไทย)</th><th>ยอดขาย (฿)</th><th>ออเดอร์</th><th>สัดส่วน %</th></tr>
+                <tr><th>Channel</th><th>Promotion (SKU)</th><th>ชื่อสินค้า (ไทย)</th><th>ยอดขาย (฿)</th><th>ออเดอร์</th><th>ชิ้น</th><th>สัดส่วน %</th></tr>
               </thead>
               <tbody id="tbodySkuAnalysisPromo"></tbody>
             </table>
@@ -2282,24 +2290,17 @@ function runSkuAnalysis() {
     skus.forEach(sku => {
       d.filter(r=>rowHasSKU(r,sku)&&r.channel===ch).forEach(r => {
         const k = r.sku_promotion||'—';
-        if (!byPromo[k]) byPromo[k]={rev:0,ord:0,pname:r.product_name||'—'};
+        if (!byPromo[k]) byPromo[k]={rev:0,ord:0,qty:0,pname:r.product_name||'—'};
         byPromo[k].rev+=parseFloat(r.revenue)||0;
         byPromo[k].ord++;
+        byPromo[k].qty+=skus.reduce((s,sku)=>s+getSKUQty(r,sku),0);
       });
     });
-    Object.entries(byPromo).sort((a,b)=>b[1].rev-a[1].rev).slice(0,5).forEach(([promo,v])=>
+    Object.entries(byPromo).slice(0,5).forEach(([promo,v])=>
       promoRows.push({ch,promo,...v}));
   });
-  const totalPromo = promoRows.reduce((s,r)=>s+r.rev,0)||1;
-  document.getElementById('tbodySkuAnalysisPromo').innerHTML = promoRows.map(({ch,promo,pname,rev,ord})=>`
-    <tr>
-      <td>${ch}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);">${promo.length>28?promo.substring(0,28)+'…':promo}</td>
-      <td>${pname.length>35?pname.substring(0,35)+'…':pname}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(Math.round(rev))}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(ord)}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent);">${((rev/totalPromo)*100).toFixed(1)}%</td>
-    </tr>`).join('')||'<tr><td colspan="6" class="empty">ไม่มีข้อมูล</td></tr>';
+  window._skuPromoRows = promoRows;
+  renderSkuAnalysisPromo();
 
   // ===== CRM Facebook =====
   const fbRows = d.filter(r=>{
@@ -2328,6 +2329,37 @@ function runSkuAnalysis() {
   Object.values(byPhone).forEach(v=>{if(v<=5)groups[v+'']++;else groups['6+']++;});
   makeChart('chartSkuAnalysisCRM','bar',Object.keys(groups).map(k=>k+' ครั้ง'),
     [{label:'จำนวนลูกค้า',data:Object.values(groups),backgroundColor:COLORS,borderRadius:4}]);
+}
+
+function renderSkuAnalysisPromo() {
+  const allRows = window._skuPromoRows || [];
+  const mode = document.getElementById('skuPromoSortMode')?.value || 'revenue';
+
+  // Sort within each channel group
+  const byChannel = {};
+  allRows.forEach(r => {
+    if (!byChannel[r.ch]) byChannel[r.ch] = [];
+    byChannel[r.ch].push(r);
+  });
+
+  const sorted = [];
+  Object.entries(byChannel).forEach(([ch, rows]) => {
+    rows.sort((a,b) => mode==='revenue' ? b.rev-a.rev : mode==='orders' ? b.ord-a.ord : b.qty-a.qty);
+    sorted.push(...rows.slice(0,5));
+  });
+
+  const totalPromo = sorted.reduce((s,r)=>s+r.rev,0)||1;
+
+  document.getElementById('tbodySkuAnalysisPromo').innerHTML = sorted.map(({ch,promo,pname,rev,ord,qty})=>`
+    <tr>
+      <td>${ch}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);">${promo.length>28?promo.substring(0,28)+'…':promo}</td>
+      <td>${pname.length>35?pname.substring(0,35)+'…':pname}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(Math.round(rev))}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(ord)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(qty)} ชิ้น</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent);">${((rev/totalPromo)*100).toFixed(1)}%</td>
+    </tr>`).join('')||'<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>';
 }
 
 function renderSkuAnalysisTrend() {
