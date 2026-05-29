@@ -1308,6 +1308,16 @@ function showPage(page) {
   document.querySelectorAll('.nav-item')[pageOrder.indexOf(page)].classList.add('active');
   document.getElementById('pageTitle').textContent = pageTitles[page];
   currentPage = page;
+
+  // Lock channel filter on skuanalysis page
+  const chFilter = document.getElementById('filterChannel');
+  const subFilter = document.getElementById('subChannelGroup');
+  if (page === 'skuanalysis') {
+    if (chFilter) { chFilter.value = ''; chFilter.disabled = true; chFilter.style.opacity = '0.35'; }
+    if (subFilter) { subFilter.style.opacity = '0.35'; subFilter.style.pointerEvents = 'none'; }
+  } else {
+    if (chFilter) { chFilter.disabled = false; chFilter.style.opacity = '1'; }
+  }
   if (page === 'skurev') {
     const from = document.getElementById('dateFrom').value;
     const to = document.getElementById('dateTo').value;
@@ -2159,14 +2169,47 @@ function filterSkuAnalysisDropdown() {
   showSkuAnalysisDropdown();
   const list = document.getElementById('skuAnalysisDropdown');
   if (!list) return;
+
+  // Build SKU → Thai name map from allData
+  const skuNameMap = {};
+  allData.forEach(r => {
+    const promo = r.sku_promotion || '';
+    const pname = r.product_name || '';
+    const skuParts = promo.split('+');
+    const nameParts = pname.split('+');
+    skuParts.forEach((sp, idx) => {
+      const sm = sp.trim().match(/^(.+?)x(\d+)$/i);
+      const nm = (nameParts[idx]||'').trim().match(/^(.+?)x(\d+)$/i);
+      if (sm && nm) {
+        const sku = sm[1].trim();
+        const name = nm[1].trim();
+        if (!skuNameMap[sku]) skuNameMap[sku] = name;
+      }
+    });
+  });
+
+  // Get all unique SKUs
   const allSKUs = [...new Set(
     allData.flatMap(r => (r.sku_promotion||'').split('+').map(s=>s.trim().replace(/x\d+$/i,'').trim()).filter(Boolean))
   )].sort();
-  const filtered = allSKUs.filter(s => s.toLowerCase().includes(q) && !selectedAnalysisSKUs.includes(s));
-  list.innerHTML = filtered.slice(0,25).map(sku => `
-    <div onclick="addAnalysisSKU('${sku}')" style="padding:7px 12px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text2);border-bottom:1px solid var(--border);"
-      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${sku}</div>`).join('') ||
-    '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">ไม่พบ SKU</div>';
+
+  // Filter by Thai name OR sku code
+  const filtered = allSKUs.filter(sku => {
+    const thaiName = (skuNameMap[sku]||'').toLowerCase();
+    return (thaiName.includes(q) || sku.toLowerCase().includes(q)) && !selectedAnalysisSKUs.includes(sku);
+  });
+
+  window._skuNameMap = skuNameMap;
+
+  list.innerHTML = filtered.slice(0,25).map(sku => {
+    const thaiName = skuNameMap[sku] || '';
+    return `<div onclick="addAnalysisSKU('${sku}')"
+      style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;color:var(--text);">${thaiName || sku}</div>
+      <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:1px;">${sku}</div>
+    </div>`;
+  }).join('') || '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">ไม่พบสินค้า</div>';
 }
 
 function showSkuAnalysisDropdown() {
@@ -2195,10 +2238,13 @@ function removeAnalysisSKU(sku) {
 function renderAnalysisChips() {
   const el = document.getElementById('skuAnalysisChips');
   if (!el) return;
-  el.innerHTML = selectedAnalysisSKUs.map((sku, i) => `
-    <span class="sku-chip selected" style="background:${COLORS[i]};" onclick="removeAnalysisSKU('${sku}')">
-      ${sku} ✕
-    </span>`).join('');
+  const nameMap = window._skuNameMap || {};
+  el.innerHTML = selectedAnalysisSKUs.map((sku, i) => {
+    const thaiName = nameMap[sku] || sku;
+    return `<span class="sku-chip selected" style="background:${COLORS[i]};" onclick="removeAnalysisSKU('${sku}')">
+      ${thaiName} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;opacity:0.8;">(${sku})</span> ✕
+    </span>`;
+  }).join('');
 }
 
 function rowHasSKU(r, sku) {
