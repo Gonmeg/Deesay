@@ -496,6 +496,9 @@
     <div class="nav-item" onclick="showPage('skurev')">
       <span class="nav-icon">💰</span> ยอดขายแยก SKU
     </div>
+    <div class="nav-item" onclick="showPage('skuanalysis')">
+      <span class="nav-icon">🔬</span> วิเคราะห์ SKU
+    </div>
   </nav>
   <div class="sidebar-footer">
     <span class="status-dot"></span>Supabase Connected<br>
@@ -934,6 +937,112 @@
 
     </div>
 
+    <!-- PAGE: SKU ANALYSIS -->
+    <div class="page" id="page-skuanalysis">
+
+      <!-- SKU Selector Bar -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;">เลือก SKU ที่ต้องการวิเคราะห์:</div>
+          <div style="position:relative;flex:1;min-width:200px;">
+            <input type="text" id="skuAnalysisSearch" placeholder="พิมพ์ค้นหา SKU หรือชื่อสินค้า..." oninput="filterSkuAnalysisDropdown()" onfocus="showSkuAnalysisDropdown()" onblur="setTimeout(hideSkuAnalysisDropdown,200)"
+              style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;font-size:13px;width:100%;font-family:'Sarabun',sans-serif;">
+            <div id="skuAnalysisDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;z-index:999;margin-top:4px;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+          </div>
+          <div id="skuAnalysisChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          <button class="btn btn-primary" onclick="runSkuAnalysis()">🔍 วิเคราะห์</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px;">เลือกได้ 1 ตัว (วิเคราะห์เดี่ยว) หรือสูงสุด 3 ตัว (เปรียบเทียบ) — ใช้ filter วันที่จากแถบด้านบน</div>
+      </div>
+
+      <div id="skuAnalysisContent" style="display:none;">
+
+        <!-- KPI Row -->
+        <div id="skuAnalysisKPIs" class="grid-4" style="margin-bottom:20px;"></div>
+
+        <!-- Trend + Channel -->
+        <div class="grid-2" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">Trend ยอดขายรายวัน</div>
+              <select id="skuAnalysisTrendMode" onchange="renderSkuAnalysisTrend()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;">
+                <option value="revenue">ยอดขาย (฿)</option>
+                <option value="qty">จำนวนชิ้น</option>
+              </select>
+            </div>
+            <div class="chart-wrap chart-wrap-lg">
+              <canvas id="chartSkuAnalysisTrend"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">ยอดขายแยกช่องทาง</div>
+            <div class="chart-wrap chart-wrap-lg">
+              <canvas id="chartSkuAnalysisChannel"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel Table -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="section-header">
+            <div class="section-title">รายละเอียดแยกช่องทาง</div>
+            <button class="btn btn-ghost" onclick="exportTable('tblSkuAnalysisChannel')">⬇ Export</button>
+          </div>
+          <div class="table-wrap">
+            <table id="tblSkuAnalysisChannel">
+              <thead>
+                <tr><th>Channel</th><th>ยอดขาย (฿)</th><th>ออเดอร์</th><th>ชิ้น</th><th>AOV</th><th>ราคา/ชิ้น</th><th>สัดส่วน %</th></tr>
+              </thead>
+              <tbody id="tbodySkuAnalysisChannel"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Top Promotions per Channel -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="section-header">
+            <div class="section-title">Top Promotion ที่มี SKU นี้ แยกตามช่องทาง</div>
+            <button class="btn btn-ghost" onclick="exportTable('tblSkuAnalysisPromo')">⬇ Export</button>
+          </div>
+          <div class="table-wrap">
+            <table id="tblSkuAnalysisPromo">
+              <thead>
+                <tr><th>Channel</th><th>Promotion (SKU)</th><th>ชื่อสินค้า (ไทย)</th><th>ยอดขาย (฿)</th><th>ออเดอร์</th><th>สัดส่วน %</th></tr>
+              </thead>
+              <tbody id="tbodySkuAnalysisPromo"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CRM Facebook -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-title" style="margin-bottom:14px;">👥 CRM — ลูกค้า Facebook ที่ซื้อ SKU นี้</div>
+          <div class="grid-3" id="skuAnalysisCRMKPIs"></div>
+          <div class="chart-wrap" style="margin-top:16px;">
+            <canvas id="chartSkuAnalysisCRM"></canvas>
+          </div>
+        </div>
+
+        <!-- Smart Summary -->
+        <div class="card ai-summary-card">
+          <div class="ai-summary-header">
+            <span class="ai-icon">✦</span>
+            <span class="ai-title">สรุปการวิเคราะห์ SKU</span>
+            <button class="btn btn-ghost btn-sm" onclick="generateSummary('skuanalysis')">🔄 วิเคราะห์ใหม่</button>
+          </div>
+          <div class="ai-summary-body" id="ai-summary-skuanalysis">กด "วิเคราะห์" เพื่อเริ่มต้น แล้วกด "วิเคราะห์ใหม่" เพื่อสรุป</div>
+        </div>
+
+      </div><!-- /skuAnalysisContent -->
+
+      <div id="skuAnalysisEmpty" style="text-align:center;padding:60px;color:var(--text3);">
+        <div style="font-size:40px;margin-bottom:16px;">🔬</div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:8px;">เลือก SKU เพื่อเริ่มวิเคราะห์</div>
+        <div style="font-size:13px;">ค้นหาและเลือก SKU จาก dropdown ด้านบน แล้วกด "วิเคราะห์"</div>
+      </div>
+
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1177,7 +1286,8 @@ const pageTitles = {
   promotion: 'Promotion / SKU',
   geo: 'จังหวัด / ภูมิภาค',
   crm: 'CRM (Facebook)',
-  skurev: 'ยอดขายแยก SKU'
+  skurev: 'ยอดขายแยก SKU',
+  skuanalysis: 'วิเคราะห์ SKU'
 };
 
 let currentPage = 'overview';
@@ -1186,7 +1296,7 @@ function showPage(page) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
-  const pageOrder = ['overview','channel','promotion','geo','crm','skurev'];
+  const pageOrder = ['overview','channel','promotion','geo','crm','skurev','skuanalysis'];
   document.querySelectorAll('.nav-item')[pageOrder.indexOf(page)].classList.add('active');
   document.getElementById('pageTitle').textContent = pageTitles[page];
   currentPage = page;
@@ -1208,6 +1318,7 @@ function renderCurrentPage() {
   else if (currentPage === 'geo') renderGeo();
   else if (currentPage === 'crm') renderCRM();
   else if (currentPage === 'skurev') renderSkuRev();
+  // skuanalysis renders on demand via runSkuAnalysis()
 }
 
 // ===== CHART HELPER =====
@@ -2032,6 +2143,218 @@ function renderSkuRevTable() {
 }
 
 
+// ===== SKU ANALYSIS =====
+let selectedAnalysisSKUs = [];
+
+function filterSkuAnalysisDropdown() {
+  const q = (document.getElementById('skuAnalysisSearch')?.value || '').toLowerCase();
+  showSkuAnalysisDropdown();
+  const list = document.getElementById('skuAnalysisDropdown');
+  if (!list) return;
+  const allSKUs = [...new Set(
+    allData.flatMap(r => (r.sku_promotion||'').split('+').map(s=>s.trim().replace(/x\d+$/i,'').trim()).filter(Boolean))
+  )].sort();
+  const filtered = allSKUs.filter(s => s.toLowerCase().includes(q) && !selectedAnalysisSKUs.includes(s));
+  list.innerHTML = filtered.slice(0,25).map(sku => `
+    <div onclick="addAnalysisSKU('${sku}')" style="padding:7px 12px;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text2);border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${sku}</div>`).join('') ||
+    '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">ไม่พบ SKU</div>';
+}
+
+function showSkuAnalysisDropdown() {
+  const list = document.getElementById('skuAnalysisDropdown');
+  if (list) list.style.display = 'block';
+}
+function hideSkuAnalysisDropdown() {
+  const list = document.getElementById('skuAnalysisDropdown');
+  if (list) list.style.display = 'none';
+}
+
+function addAnalysisSKU(sku) {
+  if (selectedAnalysisSKUs.length >= 3 || selectedAnalysisSKUs.includes(sku)) return;
+  selectedAnalysisSKUs.push(sku);
+  const inp = document.getElementById('skuAnalysisSearch');
+  if (inp) inp.value = '';
+  renderAnalysisChips();
+  filterSkuAnalysisDropdown();
+}
+
+function removeAnalysisSKU(sku) {
+  selectedAnalysisSKUs = selectedAnalysisSKUs.filter(s => s !== sku);
+  renderAnalysisChips();
+}
+
+function renderAnalysisChips() {
+  const el = document.getElementById('skuAnalysisChips');
+  if (!el) return;
+  el.innerHTML = selectedAnalysisSKUs.map((sku, i) => `
+    <span class="sku-chip selected" style="background:${COLORS[i]};" onclick="removeAnalysisSKU('${sku}')">
+      ${sku} ✕
+    </span>`).join('');
+}
+
+function rowHasSKU(r, sku) {
+  const promo = r.sku_promotion || '';
+  return promo.split('+').some(p => p.trim().replace(/x\d+$/i,'').trim().toUpperCase() === sku.toUpperCase());
+}
+
+function getSKUQty(r, sku) {
+  let qty = 0;
+  (r.sku_promotion||'').split('+').forEach(p => {
+    const m = p.trim().match(/^(.+?)x(\d+)$/i);
+    if (m && m[1].trim().toUpperCase() === sku.toUpperCase()) qty += parseInt(m[2])||1;
+  });
+  return qty;
+}
+
+function runSkuAnalysis() {
+  if (selectedAnalysisSKUs.length === 0) return;
+  document.getElementById('skuAnalysisEmpty').style.display = 'none';
+  document.getElementById('skuAnalysisContent').style.display = 'block';
+
+  const skus = selectedAnalysisSKUs;
+  const d = filteredData;
+  const isCompare = skus.length > 1;
+
+  // ===== KPIs =====
+  const kpiContainer = document.getElementById('skuAnalysisKPIs');
+  kpiContainer.innerHTML = skus.map((sku, i) => {
+    const rows = d.filter(r => rowHasSKU(r, sku));
+    const rev = rows.reduce((s,r) => s+(parseFloat(r.revenue)||0), 0);
+    const ord = rows.length;
+    const qty = rows.reduce((s,r) => s+getSKUQty(r,sku), 0);
+    return `<div class="card" style="border-color:${COLORS[i]}40;">
+      <div class="card-title" style="color:${COLORS[i]};">${sku}</div>
+      <div class="kpi-value">฿${fmtB(rev)}</div>
+      <div class="kpi-sub">${fmt(ord)} ออเดอร์ · ${fmt(qty)} ชิ้น · AOV ฿${fmt(ord?Math.round(rev/ord):0)}</div>
+    </div>`;
+  }).join('');
+
+  // ===== STORE STATE =====
+  window._skuAnalysisData = { skus, d, isCompare };
+  renderSkuAnalysisTrend();
+
+  // ===== CHANNEL CHART =====
+  const channelList = [...new Set(d.map(r=>r.channel).filter(Boolean))];
+  makeChart('chartSkuAnalysisChannel', 'bar', channelList,
+    skus.map((sku,i) => ({
+      label: sku,
+      data: channelList.map(ch => d.filter(r=>rowHasSKU(r,sku)&&r.channel===ch).reduce((s,r)=>s+(parseFloat(r.revenue)||0),0)),
+      backgroundColor: COLORS[i]+'cc', borderColor: COLORS[i], borderWidth:1, borderRadius:4
+    }))
+  );
+
+  // ===== CHANNEL TABLE =====
+  const totalRevAll = d.filter(r=>skus.some(sku=>rowHasSKU(r,sku))).reduce((s,r)=>s+(parseFloat(r.revenue)||0),0)||1;
+  let chRows = [];
+  channelList.forEach(ch => {
+    skus.forEach((sku,i) => {
+      const rows = d.filter(r=>rowHasSKU(r,sku)&&r.channel===ch);
+      if (!rows.length) return;
+      const rev = rows.reduce((s,r)=>s+(parseFloat(r.revenue)||0),0);
+      const ord = rows.length;
+      const qty = rows.reduce((s,r)=>s+getSKUQty(r,sku),0);
+      chRows.push({ch,sku,rev,ord,qty,i});
+    });
+  });
+  chRows.sort((a,b)=>b.rev-a.rev);
+
+  const chHead = document.querySelector('#tblSkuAnalysisChannel thead tr');
+  if (chHead) chHead.innerHTML = (isCompare?'<th>Channel</th><th>SKU</th>':'<th>Channel</th>') +
+    '<th>ยอดขาย (฿)</th><th>ออเดอร์</th><th>ชิ้น</th><th>AOV</th><th>ราคา/ชิ้น</th><th>สัดส่วน %</th>';
+
+  document.getElementById('tbodySkuAnalysisChannel').innerHTML = chRows.map(({ch,sku,rev,ord,qty,i}) => `
+    <tr>
+      <td>${ch}</td>
+      ${isCompare?`<td style="color:${COLORS[i]};font-family:'IBM Plex Mono',monospace;font-size:11px;">${sku}</td>`:''}
+      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(Math.round(rev))}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(ord)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(qty)} ชิ้น</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(ord?Math.round(rev/ord):0)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(qty?Math.round(rev/qty):0)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent);">${((rev/totalRevAll)*100).toFixed(1)}%</td>
+    </tr>`).join('');
+
+  // ===== TOP PROMOS PER CHANNEL =====
+  const promoRows = [];
+  channelList.forEach(ch => {
+    const byPromo = {};
+    skus.forEach(sku => {
+      d.filter(r=>rowHasSKU(r,sku)&&r.channel===ch).forEach(r => {
+        const k = r.sku_promotion||'—';
+        if (!byPromo[k]) byPromo[k]={rev:0,ord:0,pname:r.product_name||'—'};
+        byPromo[k].rev+=parseFloat(r.revenue)||0;
+        byPromo[k].ord++;
+      });
+    });
+    Object.entries(byPromo).sort((a,b)=>b[1].rev-a[1].rev).slice(0,5).forEach(([promo,v])=>
+      promoRows.push({ch,promo,...v}));
+  });
+  const totalPromo = promoRows.reduce((s,r)=>s+r.rev,0)||1;
+  document.getElementById('tbodySkuAnalysisPromo').innerHTML = promoRows.map(({ch,promo,pname,rev,ord})=>`
+    <tr>
+      <td>${ch}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);">${promo.length>28?promo.substring(0,28)+'…':promo}</td>
+      <td>${pname.length>35?pname.substring(0,35)+'…':pname}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(Math.round(rev))}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${fmt(ord)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent);">${((rev/totalPromo)*100).toFixed(1)}%</td>
+    </tr>`).join('')||'<tr><td colspan="6" class="empty">ไม่มีข้อมูล</td></tr>';
+
+  // ===== CRM Facebook =====
+  const fbRows = d.filter(r=>{
+    const ch=(r.channel||'').toLowerCase();
+    const sc=(r.sub_channel||'').toLowerCase();
+    return ch==='online'||sc.includes('facebook')||sc.includes('deesay thailand')||sc.includes('deesay cosmetics');
+  }).filter(r=>skus.some(sku=>rowHasSKU(r,sku)));
+
+  const byPhone={};
+  fbRows.forEach(r=>{
+    const p=r.phone||'';
+    if(!p||p==='***'||p.length<5)return;
+    byPhone[p]=(byPhone[p]||0)+1;
+  });
+  const totalCust=Object.keys(byPhone).length;
+  const repeatCust=Object.values(byPhone).filter(v=>v>=2).length;
+  const maxPurchase=Math.max(...Object.values(byPhone),0);
+  const avgFreq=totalCust?(Object.values(byPhone).reduce((s,v)=>s+v,0)/totalCust).toFixed(1):0;
+
+  document.getElementById('skuAnalysisCRMKPIs').innerHTML=`
+    <div class="card"><div class="card-title">ลูกค้า FB ที่ซื้อ SKU นี้</div><div class="kpi-value">${fmt(totalCust)}</div><div class="kpi-sub">unique เบอร์โทร</div></div>
+    <div class="card"><div class="card-title">ซื้อซ้ำ (2+ ครั้ง)</div><div class="kpi-value">${fmt(repeatCust)}</div><div class="kpi-sub">${fmtPct(repeatCust,totalCust)} ของลูกค้าทั้งหมด</div></div>
+    <div class="card"><div class="card-title">ซื้อเฉลี่ย / คน</div><div class="kpi-value">${avgFreq}</div><div class="kpi-sub">สูงสุด ${fmt(maxPurchase)} ครั้ง</div></div>`;
+
+  const groups={'1':0,'2':0,'3':0,'4':0,'5':0,'6+':0};
+  Object.values(byPhone).forEach(v=>{if(v<=5)groups[v+'']++;else groups['6+']++;});
+  makeChart('chartSkuAnalysisCRM','bar',Object.keys(groups).map(k=>k+' ครั้ง'),
+    [{label:'จำนวนลูกค้า',data:Object.values(groups),backgroundColor:COLORS,borderRadius:4}]);
+}
+
+function renderSkuAnalysisTrend() {
+  const state = window._skuAnalysisData;
+  if (!state) return;
+  const {skus,d} = state;
+  const mode = document.getElementById('skuAnalysisTrendMode')?.value||'revenue';
+  const days = [...new Set(d.map(r=>r.date).filter(Boolean))].sort();
+  const datasets = skus.map((sku,i)=>{
+    const daily={};
+    d.filter(r=>rowHasSKU(r,sku)).forEach(r=>{
+      if(!r.date)return;
+      if(!daily[r.date])daily[r.date]={rev:0,qty:0};
+      daily[r.date].rev+=parseFloat(r.revenue)||0;
+      daily[r.date].qty+=getSKUQty(r,sku);
+    });
+    return {
+      label:sku,
+      data:days.map(day=>daily[day]?.[mode==='revenue'?'rev':'qty']||0),
+      borderColor:COLORS[i], backgroundColor:COLORS[i]+'20',
+      borderWidth:2, pointRadius:days.length>60?0:2, tension:0.3, fill:false
+    };
+  });
+  makeChart('chartSkuAnalysisTrend','line',days,datasets);
+}
+
+
 function generateSummary(page) {
   const el = document.getElementById('ai-summary-' + page);
   if (!el) return;
@@ -2207,6 +2530,24 @@ function generateSummary(page) {
       if (highPrice) lines.push(`• SKU ราคา/ชิ้นสูงสุด: ${highPrice.k} (฿${fmt(Math.round(highPrice.p))} ต่อชิ้น)`);
     }
     lines.push(`• 💡 ตอนนี้ยังไม่มีข้อมูลต้นทุน — เมื่อเพิ่มต้นทุนแล้วจะสามารถดู Margin % และ Gross Profit แยกต่อ SKU ได้`);
+  }
+
+  else if (page === 'skuanalysis') {
+    const skus = selectedAnalysisSKUs;
+    if (!skus.length) { el.textContent = 'กรุณาเลือก SKU ก่อน'; return; }
+    skus.forEach((sku,i) => {
+      const rows = d.filter(r => rowHasSKU(r,sku));
+      const rev = rows.reduce((s,r)=>s+(parseFloat(r.revenue)||0),0);
+      const ord = rows.length;
+      const qty = rows.reduce((s,r)=>s+getSKUQty(r,sku),0);
+      const byCh = {};
+      rows.forEach(r=>{ const k=r.channel||'ไม่ระบุ'; if(!byCh[k])byCh[k]={rev:0,ord:0}; byCh[k].rev+=parseFloat(r.revenue)||0; byCh[k].ord++; });
+      const topCh = Object.entries(byCh).sort((a,b)=>b[1].rev-a[1].rev)[0];
+      lines.push(`\n▶ ${sku}`);
+      lines.push(`• ยอดขาย ฿${fmtB(rev)} | ${fmt(ord)} ออเดอร์ | ${fmt(qty)} ชิ้น`);
+      if (topCh) lines.push(`• ช่องทางที่ขายดีสุด: ${topCh[0]} (฿${fmtB(topCh[1].rev)}, ${((topCh[1].rev/rev)*100).toFixed(1)}%)`);
+    });
+    lines.push(`\n• 💡 ดู Top Promotion และ CRM ด้านล่างเพื่อวิเคราะห์เพิ่มเติม`);
   }
 
   setTimeout(() => {
