@@ -2335,24 +2335,23 @@ function renderSkuAnalysisPromo() {
   const allRows = window._skuPromoRows || [];
   const mode = document.getElementById('skuPromoSortMode')?.value || 'revenue';
 
-  // Sort within each channel group
-  const byChannel = {};
-  allRows.forEach(r => {
-    if (!byChannel[r.ch]) byChannel[r.ch] = [];
-    byChannel[r.ch].push(r);
-  });
-
-  const sorted = [];
-  Object.entries(byChannel).forEach(([ch, rows]) => {
-    rows.sort((a,b) => mode==='revenue' ? b.rev-a.rev : mode==='orders' ? b.ord-a.ord : b.qty-a.qty);
-    sorted.push(...rows.slice(0,5));
-  });
+  // Sort ALL rows globally regardless of channel
+  const sorted = [...allRows].sort((a,b) =>
+    mode==='revenue' ? b.rev-a.rev : mode==='orders' ? b.ord-a.ord : b.qty-a.qty
+  );
 
   const totalPromo = sorted.reduce((s,r)=>s+r.rev,0)||1;
 
+  // Channel color map
+  const chColors = {};
+  const chList = [...new Set(sorted.map(r=>r.ch))];
+  const chBg = ['rgba(96,165,250,0.08)','rgba(244,114,182,0.08)','rgba(251,146,60,0.08)','rgba(167,139,250,0.08)','rgba(74,222,128,0.08)'];
+  const chBorder = ['#60a5fa','#f472b6','#fb923c','#a78bfa','#4ade80'];
+  chList.forEach((ch,i) => { chColors[ch] = { bg: chBg[i%chBg.length], border: chBorder[i%chBorder.length] }; });
+
   document.getElementById('tbodySkuAnalysisPromo').innerHTML = sorted.map(({ch,promo,pname,rev,ord,qty})=>`
-    <tr>
-      <td>${ch}</td>
+    <tr style="background:${chColors[ch]?.bg||''};">
+      <td style="font-weight:600;border-left:3px solid ${chColors[ch]?.border||'transparent'};padding-left:10px;">${ch}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3);">${promo.length>28?promo.substring(0,28)+'…':promo}</td>
       <td>${pname.length>35?pname.substring(0,35)+'…':pname}</td>
       <td style="font-family:'IBM Plex Mono',monospace;">฿${fmt(Math.round(rev))}</td>
