@@ -746,6 +746,9 @@
 
     <!-- PAGE: GEO -->
     <div class="page" id="page-geo">
+      <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--blue);margin-bottom:16px;">
+        📌 หน้านี้แสดงข้อมูลเฉพาะช่องทาง <strong>Online (Facebook)</strong> เท่านั้น เนื่องจากช่องทางอื่น (Shopee, Lazada, TikTok) ไม่มีข้อมูลจังหวัด
+      </div>
       <div class="grid-2">
         <div class="card">
           <div class="section-header">
@@ -1728,7 +1731,7 @@ function renderPromotion() {
 
 // ===== GEO =====
 const REGIONS = {
-  'กรุงเทพมหานคร': 'กรุงเทพฯ',
+  'กรุงเทพมหานคร': 'กรุงเทพมหานคร',
   'นนทบุรี': 'ภาคกลาง', 'ปทุมธานี': 'ภาคกลาง', 'สมุทรปราการ': 'ภาคกลาง',
   'อยุธยา': 'ภาคกลาง', 'สระบุรี': 'ภาคกลาง', 'ลพบุรี': 'ภาคกลาง',
   'ชลบุรี': 'ภาคตะวันออก', 'ระยอง': 'ภาคตะวันออก', 'จันทบุรี': 'ภาคตะวันออก',
@@ -1742,7 +1745,7 @@ const REGIONS = {
 
 function getRegion(prov) {
   if (!prov) return 'ไม่ระบุ';
-  if (prov.includes('กรุงเทพ')) return 'กรุงเทพฯ';
+  if (prov.includes('กรุงเทพ')) return 'กรุงเทพมหานคร';
   for (const [k, v] of Object.entries(REGIONS)) {
     if (prov.includes(k)) return v;
   }
@@ -1758,14 +1761,14 @@ function renderGeo() {
   const d = filteredData;
   const byProv = {};
   d.forEach(r => {
-    const k = r.province || 'ไม่ระบุ';
+    const k = r.province || '';
+    if (!k || k === 'ไม่ระบุ') return; // ข้ามแถวที่ไม่มีจังหวัด
     if (!byProv[k]) byProv[k] = { rev: 0, ord: 0 };
     byProv[k].rev += parseFloat(r.revenue) || 0;
     byProv[k].ord++;
   });
 
   const sorted = Object.entries(byProv).sort((a,b) => b[1].rev - a[1].rev);
-  const maxRev = sorted[0]?.[1].rev || 1;
 
   document.getElementById('tbodyTopProvince').innerHTML = sorted.slice(0, 20).map(([k, v], i) => `
     <tr>
@@ -1802,12 +1805,12 @@ function renderGeo() {
     </div>`).join('');
 
   // BKK vs Upcountry
-  const bkk = byProv['กรุงเทพมหานคร'] || byRegion['กรุงเทพฯ'] || { rev: 0, ord: 0 };
-  const upRev = totalRev - (byRegion['กรุงเทพฯ']?.rev || 0);
-  const upOrd = d.length - (byRegion['กรุงเทพฯ']?.ord || 0);
+  const bkk = byProv['กรุงเทพมหานคร'] || byRegion['กรุงเทพมหานคร'] || { rev: 0, ord: 0 };
+  const upRev = totalRev - (byRegion['กรุงเทพมหานคร']?.rev || 0);
+  const upOrd = d.length - (byRegion['กรุงเทพมหานคร']?.ord || 0);
 
-  document.getElementById('bkk-revenue').textContent = fmtB(byRegion['กรุงเทพฯ']?.rev || 0);
-  document.getElementById('bkk-orders').textContent = fmt(byRegion['กรุงเทพฯ']?.ord || 0) + ' ออเดอร์';
+  document.getElementById('bkk-revenue').textContent = fmtB(byRegion['กรุงเทพมหานคร']?.rev || 0);
+  document.getElementById('bkk-orders').textContent = fmt(byRegion['กรุงเทพมหานคร']?.ord || 0) + ' ออเดอร์';
   document.getElementById('upcountry-revenue').textContent = fmtB(upRev);
   document.getElementById('upcountry-orders').textContent = fmt(upOrd) + ' ออเดอร์';
 }
@@ -2622,7 +2625,7 @@ function generateSummary(page) {
     const bkkRev = sorted.filter(([k]) => k.includes('กรุงเทพ')).reduce((s,[,v])=>s+v.rev,0);
     const upRev = totalRev - bkkRev;
     const bkkPct = totalRev ? (bkkRev/totalRev*100).toFixed(1) : 0;
-    lines.push(`• กรุงเทพฯ vs ต่างจังหวัด: ${bkkPct}% vs ${(100-parseFloat(bkkPct)).toFixed(1)}%`);
+    lines.push(`• กรุงเทพมหานคร vs ต่างจังหวัด: ${bkkPct}% vs ${(100-parseFloat(bkkPct)).toFixed(1)}%`);
 
     // High AOV provinces (opportunity)
     const highAOV = sorted.filter(([,v]) => v.ord >= 5 && v.ord < 50).sort((a,b) => (b[1].rev/b[1].ord)-(a[1].rev/a[1].ord)).slice(0,3);
