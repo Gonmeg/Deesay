@@ -536,15 +536,11 @@
     <div class="filters">
       <div class="filter-group">
         <span class="filter-label">ตั้งแต่</span>
-        <select id="dateFromDay" style="width:44px;"></select>
-        <select id="dateFromMonth" style="width:70px;"></select>
-        <select id="dateFromYear" style="width:68px;"></select>
+        <input type="date" id="dateFrom">
       </div>
       <div class="filter-group">
         <span class="filter-label">ถึง</span>
-        <select id="dateToDay" style="width:44px;"></select>
-        <select id="dateToMonth" style="width:70px;"></select>
-        <select id="dateToYear" style="width:68px;"></select>
+        <input type="date" id="dateTo">
       </div>
       <div class="filter-group">
         <span class="filter-label">Channel</span>
@@ -1373,46 +1369,18 @@ function toggleTheme() {
 // ===== DATE SELECT HELPERS =====
 const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-function buildDateSelects() {
+function setDefaultDateFilter() {
   const now = new Date();
-  const curYear = now.getFullYear();
-  const years = [curYear-1, curYear, curYear+1];
-
-  ['From','To'].forEach(suffix => {
-    const dayEl = document.getElementById('date'+suffix+'Day');
-    const moEl = document.getElementById('date'+suffix+'Month');
-    const yrEl = document.getElementById('date'+suffix+'Year');
-    if (!dayEl || !moEl || !yrEl) return;
-
-    // Days
-    dayEl.innerHTML = Array.from({length:31},(_,i)=>`<option value="${String(i+1).padStart(2,'0')}">${String(i+1).padStart(2,'0')}</option>`).join('');
-    // Months
-    moEl.innerHTML = MONTHS_TH.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
-    // Years
-    yrEl.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  });
-
-  // Set defaults: current month
-  const y = curYear, m = now.getMonth()+1;
-  const lastDay = new Date(y, m, 0).getDate();
-  setDateSelect('From', y, m, 1);
-  setDateSelect('To', y, m, lastDay);
-}
-
-function setDateSelect(suffix, year, month, day) {
-  const d = document.getElementById('date'+suffix+'Day');
-  const mo = document.getElementById('date'+suffix+'Month');
-  const yr = document.getElementById('date'+suffix+'Year');
-  if (d) d.value = String(day).padStart(2,'0');
-  if (mo) mo.value = String(month).padStart(2,'0');
-  if (yr) yr.value = String(year);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+  document.getElementById('dateFrom').value = `${y}-${m}-01`;
+  document.getElementById('dateTo').value = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
 }
 
 function getDateValue(suffix) {
-  const d = document.getElementById('date'+suffix+'Day')?.value || '01';
-  const m = document.getElementById('date'+suffix+'Month')?.value || '01';
-  const y = document.getElementById('date'+suffix+'Year')?.value || '2026';
-  return `${y}-${m}-${d}`;
+  const el = document.getElementById('date' + suffix);
+  return el ? el.value : '';
 }
 
 // ===== CHART HELPER =====
