@@ -24,6 +24,23 @@
     --orange: #fb923c;
     --pink: #f472b6;
   }
+  body.light-theme {
+    --bg: #f5f5f7;
+    --bg2: #ffffff;
+    --bg3: #ebebef;
+    --border: #d0d0dc;
+    --accent: #b8892e;
+    --accent2: #a07020;
+    --text: #1a1a2e;
+    --text2: #4a4a6a;
+    --text3: #8a8aaa;
+    --green: #16a34a;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+    --orange: #ea580c;
+    --pink: #db2777;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Sarabun', sans-serif;
@@ -503,6 +520,11 @@
   <div class="sidebar-footer">
     <span class="status-dot"></span>Supabase Connected<br>
     <span id="lastUpdate" style="margin-top:4px;display:block;">—</span>
+    <div style="margin-top:10px;">
+      <button onclick="toggleTheme()" id="themeBtn" style="width:100%;padding:6px 0;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Sarabun',sans-serif;">
+        🌙 โหมดมืด
+      </button>
+    </div>
   </div>
 </aside>
 
@@ -514,11 +536,15 @@
     <div class="filters">
       <div class="filter-group">
         <span class="filter-label">ตั้งแต่</span>
-        <input type="date" id="dateFrom" value="2026-01-01">
+        <select id="dateFromDay" style="width:44px;"></select>
+        <select id="dateFromMonth" style="width:70px;"></select>
+        <select id="dateFromYear" style="width:68px;"></select>
       </div>
       <div class="filter-group">
         <span class="filter-label">ถึง</span>
-        <input type="date" id="dateTo" value="2026-05-31">
+        <select id="dateToDay" style="width:44px;"></select>
+        <select id="dateToMonth" style="width:70px;"></select>
+        <select id="dateToYear" style="width:68px;"></select>
       </div>
       <div class="filter-group">
         <span class="filter-label">Channel</span>
@@ -1087,8 +1113,8 @@ function cmpBadge(curr, prev) {
 
 // Get previous period data matching the same duration as current filter
 function getPrevPeriodData() {
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
+  const from = getDateValue('From');
+  const to = getDateValue('To');
   if (!from || !to) return [];
 
   const fromDate = new Date(from);
@@ -1214,17 +1240,13 @@ function onChannelChange() {
 }
 
 function setDefaultDateFilter() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
-  document.getElementById('dateFrom').value = `${y}-${m}-01`;
-  document.getElementById('dateTo').value = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
+  buildDateSelects();
+  // default is already set in buildDateSelects
 }
 
 function applyFilters() {
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
+  const from = getDateValue('From');
+  const to = getDateValue('To');
   const ch = document.getElementById('filterChannel').value;
   const sub = document.getElementById('filterSubChannel').value;
 
@@ -1319,8 +1341,8 @@ function showPage(page) {
     if (chFilter) { chFilter.disabled = false; chFilter.style.opacity = '1'; }
   }
   if (page === 'skurev') {
-    const from = document.getElementById('dateFrom').value;
-    const to = document.getElementById('dateTo').value;
+    const from = getDateValue('From');
+    const to = getDateValue('To');
     const ch = document.getElementById('filterChannel').value;
     const sub = document.getElementById('filterSubChannel').value;
     loadSkuDataAndRender(from, to, ch, sub);
@@ -1337,6 +1359,60 @@ function renderCurrentPage() {
   else if (currentPage === 'crm') renderCRM();
   else if (currentPage === 'skurev') renderSkuRev();
   // skuanalysis renders on demand via runSkuAnalysis()
+}
+
+// ===== THEME TOGGLE =====
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = isLight ? '🌙 โหมดมืด' : '☀️ โหมดสว่าง';
+  // Re-render charts to update colors
+  setTimeout(() => renderCurrentPage(), 50);
+}
+
+// ===== DATE SELECT HELPERS =====
+const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function buildDateSelects() {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const years = [curYear-1, curYear, curYear+1];
+
+  ['From','To'].forEach(suffix => {
+    const dayEl = document.getElementById('date'+suffix+'Day');
+    const moEl = document.getElementById('date'+suffix+'Month');
+    const yrEl = document.getElementById('date'+suffix+'Year');
+    if (!dayEl || !moEl || !yrEl) return;
+
+    // Days
+    dayEl.innerHTML = Array.from({length:31},(_,i)=>`<option value="${String(i+1).padStart(2,'0')}">${String(i+1).padStart(2,'0')}</option>`).join('');
+    // Months
+    moEl.innerHTML = MONTHS_TH.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
+    // Years
+    yrEl.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  });
+
+  // Set defaults: current month
+  const y = curYear, m = now.getMonth()+1;
+  const lastDay = new Date(y, m, 0).getDate();
+  setDateSelect('From', y, m, 1);
+  setDateSelect('To', y, m, lastDay);
+}
+
+function setDateSelect(suffix, year, month, day) {
+  const d = document.getElementById('date'+suffix+'Day');
+  const mo = document.getElementById('date'+suffix+'Month');
+  const yr = document.getElementById('date'+suffix+'Year');
+  if (d) d.value = String(day).padStart(2,'0');
+  if (mo) mo.value = String(month).padStart(2,'0');
+  if (yr) yr.value = String(year);
+}
+
+function getDateValue(suffix) {
+  const d = document.getElementById('date'+suffix+'Day')?.value || '01';
+  const m = document.getElementById('date'+suffix+'Month')?.value || '01';
+  const y = document.getElementById('date'+suffix+'Year')?.value || '2026';
+  return `${y}-${m}-${d}`;
 }
 
 // ===== CHART HELPER =====
@@ -1439,8 +1515,8 @@ function renderOverview() {
   owow.textContent = oCmp.text; owow.className = oCmp.cls;
 
   // คำนวณยอดตีกลับ — จาก allData ที่ filter date แต่ไม่ filter settled
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
+  const from = getDateValue('From');
+  const to = getDateValue('To');
   const ch = document.getElementById('filterChannel').value;
   const sub = document.getElementById('filterSubChannel').value;
   const allInRange = allData.filter(r => {
@@ -2437,8 +2513,8 @@ function generateSummary(page) {
   if (!el) return;
   el.innerHTML = '<div class="ai-loading">กำลังวิเคราะห์...</div>';
 
-  const from = document.getElementById('dateFrom').value;
-  const to = document.getElementById('dateTo').value;
+  const from = getDateValue('From');
+  const to = getDateValue('To');
   const d = filteredData;
   const prev = getPrevPeriodData();
 
@@ -2636,8 +2712,8 @@ function generateSummary(page) {
 async function init() {
   try {
     setDefaultDateFilter();
-    const from = document.getElementById('dateFrom').value;
-    const to = document.getElementById('dateTo').value;
+    const from = getDateValue('From');
+    const to = getDateValue('To');
 
     // Fetch only normalized_all on init (SKU data loaded on demand)
     allData = await fetchAll();
