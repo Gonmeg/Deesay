@@ -516,6 +516,9 @@
     <div class="nav-item" onclick="showPage('skuanalysis')">
       <span class="nav-icon">🔬</span> วิเคราะห์ SKU
     </div>
+    <div class="nav-item" onclick="showPage('adperf')">
+      <span class="nav-icon">📊</span> Ad Performance
+    </div>
   </nav>
   <div class="sidebar-footer">
     <span class="status-dot"></span>Supabase Connected<br>
@@ -1076,6 +1079,94 @@
 
     </div>
 
+    <!-- PAGE: AD PERFORMANCE -->
+    <div class="page" id="page-adperf">
+
+      <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--blue);margin-bottom:16px;">
+        📌 ข้อมูลดึงจาก Google Sheets (อัพเดทรายวัน) — ใช้ filter วันที่จากแถบด้านบน
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid-4" style="margin-bottom:20px;">
+        <div class="card"><div class="card-title">ยอดขาย GMV</div><div class="kpi-value" id="adp-gmv" style="color:var(--blue);">—</div><div class="kpi-sub">ทุกช่องทาง</div></div>
+        <div class="card"><div class="card-title">ค่าแอดรวม</div><div class="kpi-value" id="adp-ads" style="color:var(--red);">—</div><div class="kpi-sub">ทุกช่องทาง</div></div>
+        <div class="card"><div class="card-title">ROAS</div><div class="kpi-value" id="adp-roas" style="color:var(--green);">—</div><div class="kpi-sub">GMV ÷ ค่าแอด</div></div>
+        <div class="card"><div class="card-title">% ค่าแอด / GMV</div><div class="kpi-value" id="adp-pct">—</div><div class="kpi-sub">ค่าแอดต่อยอดขาย</div></div>
+      </div>
+
+      <!-- View toggle -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">ช่วงเวลา:</span>
+        <div class="toggle-group" style="display:flex;gap:2px;background:var(--bg3);border-radius:6px;padding:3px;">
+          <button class="toggle-btn" id="adp-yr" onclick="setAdpView('year',this)">ทั้งปี</button>
+          <button class="toggle-btn active" id="adp-mo" onclick="setAdpView('month',this)">รายเดือน</button>
+          <button class="toggle-btn" id="adp-dy" onclick="setAdpView('day',this)">รายวัน</button>
+        </div>
+      </div>
+
+      <!-- Overall chart -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-header">
+          <div class="section-title">ภาพรวมทุกช่องทาง</div>
+          <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:var(--text2);">
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:rgba(96,165,250,0.65);border-radius:2px;display:inline-block;"></span>GMV</span>
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:rgba(248,113,113,0.55);border-radius:2px;display:inline-block;"></span>ค่าแอด</span>
+            <span style="display:flex;align-items:center;gap:5px;"><span style="width:16px;height:2px;background:#f87171;display:inline-block;"></span>%ค่าแอด (แกนขวา)</span>
+          </div>
+        </div>
+        <div class="chart-wrap chart-wrap-lg"><canvas id="adpChartOverall"></canvas></div>
+      </div>
+
+      <!-- Channel grid -->
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="section-header"><div class="section-title">📱 Facebook / Online</div></div>
+          <div class="kpi-sub" id="adp-sub-fb" style="margin-bottom:10px;">—</div>
+          <div class="chart-wrap"><canvas id="adpChartFB"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-header"><div class="section-title">🎵 TikTok Shop</div></div>
+          <div class="kpi-sub" id="adp-sub-tt" style="margin-bottom:10px;">—</div>
+          <div class="chart-wrap"><canvas id="adpChartTT"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">🛍️ Shopee</div>
+            <select id="adp-sel-sh" onchange="renderAdpChannel('adpChartSH','adp-sub-sh','sh')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:5px;font-size:11px;">
+              <option value="all">รวม 2 ร้าน</option>
+              <option value="Shopee24Hr">Shopee 24Hr</option>
+              <option value="ShopeeMall">Shopee Mall</option>
+            </select>
+          </div>
+          <div class="kpi-sub" id="adp-sub-sh" style="margin-bottom:10px;">—</div>
+          <div class="chart-wrap"><canvas id="adpChartSH"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">🟠 Lazada</div>
+            <select id="adp-sel-lz" onchange="renderAdpChannel('adpChartLZ','adp-sub-lz','lz')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:5px;font-size:11px;">
+              <option value="all">รวม 2 ร้าน</option>
+              <option value="Lazada24Hr">Lazada 24Hr</option>
+              <option value="LazadaMall">Lazada Mall</option>
+            </select>
+          </div>
+          <div class="kpi-sub" id="adp-sub-lz" style="margin-bottom:10px;">—</div>
+          <div class="chart-wrap"><canvas id="adpChartLZ"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Smart Summary -->
+      <div class="card ai-summary-card">
+        <div class="ai-summary-header">
+          <span class="ai-icon">✦</span>
+          <span class="ai-title">สรุป Ad Performance</span>
+          <button class="btn btn-ghost btn-sm" onclick="renderAdpSummary()">🔄 วิเคราะห์ใหม่</button>
+        </div>
+        <div class="ai-summary-body" id="adp-summary">กด "วิเคราะห์ใหม่" เพื่อสรุปข้อมูล</div>
+      </div>
+
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1316,7 +1407,8 @@ const pageTitles = {
   geo: 'จังหวัด / ภูมิภาค',
   crm: 'CRM (Facebook)',
   skurev: 'ยอดขายแยก SKU',
-  skuanalysis: 'วิเคราะห์ SKU'
+  skuanalysis: 'วิเคราะห์ SKU',
+  adperf: 'Ad Performance'
 };
 
 let currentPage = 'overview';
@@ -1325,7 +1417,7 @@ function showPage(page) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
-  const pageOrder = ['overview','channel','promotion','geo','crm','skurev','skuanalysis'];
+  const pageOrder = ['overview','channel','promotion','geo','crm','skurev','skuanalysis','adperf'];
   document.querySelectorAll('.nav-item')[pageOrder.indexOf(page)].classList.add('active');
   document.getElementById('pageTitle').textContent = pageTitles[page];
   currentPage = page;
@@ -1345,6 +1437,8 @@ function showPage(page) {
     const ch = document.getElementById('filterChannel').value;
     const sub = document.getElementById('filterSubChannel').value;
     loadSkuDataAndRender(from, to, ch, sub);
+  } else if (page === 'adperf') {
+    renderAdpAll();
   } else {
     renderCurrentPage();
   }
@@ -1357,7 +1451,7 @@ function renderCurrentPage() {
   else if (currentPage === 'geo') renderGeo();
   else if (currentPage === 'crm') renderCRM();
   else if (currentPage === 'skurev') renderSkuRev();
-  // skuanalysis renders on demand via runSkuAnalysis()
+  // skuanalysis and adperf render on demand
 }
 
 // ===== THEME TOGGLE =====
@@ -2677,6 +2771,154 @@ function generateSummary(page) {
   setTimeout(() => {
     el.textContent = lines.join('\n');
   }, 300);
+}
+
+
+// ===== AD PERFORMANCE =====
+const GSHEET_ID = '110H7f5cbnAZZFWGlZGlHbxEgDMLFvqquk5-n_Cl9e2I';
+const GSHEET_TAB = 'summary';
+let adRawData = [];
+let adView = 'month';
+
+async function fetchAdData() {
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${GSHEET_ID}/gviz/tq?tqx=out:json&sheet=${GSHEET_TAB}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.substring(47, text.length - 2));
+    adRawData = json.table.rows.map(r => ({
+      channel: r.c[0]?.v || '',
+      date: r.c[1]?.v ? formatGDate(r.c[1].v) : '',
+      ads: parseFloat(r.c[2]?.v) || 0,
+      gmv: parseFloat(r.c[3]?.v) || 0,
+    })).filter(r => r.channel && r.date);
+  } catch(e) { console.error('Ad fetch error:', e); adRawData = []; }
+}
+
+function formatGDate(v) {
+  if (typeof v === 'string' && v.startsWith('Date(')) {
+    const p = v.replace('Date(','').replace(')','').split(',');
+    return `${p[0]}-${String(parseInt(p[1])+1).padStart(2,'0')}-${String(p[2]).padStart(2,'0')}`;
+  }
+  return v;
+}
+
+function getAdFiltered() {
+  const from = getDateValue('From'), to = getDateValue('To');
+  return adRawData.filter(r => r.date >= from && r.date <= to);
+}
+
+function aggAd(data, view) {
+  const m = {};
+  data.forEach(r => {
+    const k = view==='year'?r.date.substring(0,4):view==='month'?r.date.substring(0,7):r.date;
+    if(!m[k]) m[k]={gmv:0,ads:0};
+    m[k].gmv+=r.gmv; m[k].ads+=r.ads;
+  });
+  return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0]));
+}
+
+function adLabel(k) {
+  if(adView==='month'){const[,mo]=k.split('-');return['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(mo)-1];}
+  return adView==='day'?k.substring(5):k;
+}
+
+function makeAdChart(id, labels, gmvArr, adsArr, pctArr) {
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id); if(!ctx) return;
+  charts[id] = new Chart(ctx, {
+    data:{labels,datasets:[
+      {type:'bar',label:'GMV',data:gmvArr,backgroundColor:'rgba(96,165,250,0.65)',borderColor:'#60a5fa',borderWidth:1,borderRadius:3,yAxisID:'y'},
+      {type:'bar',label:'ค่าแอด',data:adsArr,backgroundColor:'rgba(248,113,113,0.55)',borderColor:'#f87171',borderWidth:1,borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'%ค่าแอด',data:pctArr,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',borderWidth:2,pointRadius:labels.length>60?0:3,tension:0.3,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+        if(ctx.datasetIndex===2)return ` %ค่าแอด: ${ctx.raw.toFixed(1)}%`;
+        return ` ${ctx.dataset.label}: ฿${fmt(ctx.raw)}`;
+      }}}},
+      scales:{
+        x:{ticks:{color:'#5a5a72',font:{family:'Sarabun',size:10}},grid:{color:'rgba(42,42,58,0.5)'}},
+        y:{position:'left',ticks:{color:'#5a5a72',font:{size:10},callback:v=>fmtB(v)},grid:{color:'rgba(42,42,58,0.5)'}},
+        y2:{position:'right',ticks:{color:'#f87171',font:{size:10},callback:v=>v.toFixed(0)+'%'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function setAdpView(v, btn) {
+  adView=v;
+  document.querySelectorAll('#page-adperf .toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAdpAll();
+}
+
+function renderAdpChannel(chartId, subId, ch) {
+  const d = getAdFiltered();
+  let filtered;
+  if(ch==='fb') filtered=d.filter(r=>r.channel==='Online'||r.channel.toLowerCase().includes('facebook'));
+  else if(ch==='tt') filtered=d.filter(r=>r.channel.toLowerCase().includes('tiktok'));
+  else if(ch==='sh'){const sel=document.getElementById('adp-sel-sh')?.value||'all';filtered=d.filter(r=>sel==='all'?r.channel.toLowerCase().includes('shopee'):r.channel===sel);}
+  else if(ch==='lz'){const sel=document.getElementById('adp-sel-lz')?.value||'all';filtered=d.filter(r=>sel==='all'?r.channel.toLowerCase().includes('lazada'):r.channel===sel);}
+  else filtered=d;
+  const a=aggAd(filtered,adView);
+  const labels=a.map(([k])=>adLabel(k));
+  const gmvArr=a.map(([,v])=>v.gmv), adsArr=a.map(([,v])=>v.ads);
+  const pctArr=a.map(([,v])=>v.gmv>0?(v.ads/v.gmv*100):0);
+  const tGmv=gmvArr.reduce((s,v)=>s+v,0), tAds=adsArr.reduce((s,v)=>s+v,0);
+  const roas=tAds>0?(tGmv/tAds).toFixed(2):0;
+  if(subId) document.getElementById(subId).textContent=`GMV ฿${fmtB(tGmv)} · แอด ฿${fmtB(tAds)} · ROAS ${roas}x`;
+  makeAdChart(chartId,labels,gmvArr,adsArr,pctArr);
+}
+
+function renderAdpAll() {
+  if(adRawData.length===0){
+    document.getElementById('adp-summary').textContent='⏳ กำลังโหลดข้อมูลจาก Google Sheets...';
+    fetchAdData().then(()=>renderAdpAll()); return;
+  }
+  const d=getAdFiltered();
+  const a=aggAd(d,adView);
+  const labels=a.map(([k])=>adLabel(k));
+  const gmvArr=a.map(([,v])=>v.gmv), adsArr=a.map(([,v])=>v.ads);
+  const pctArr=a.map(([,v])=>v.gmv>0?(v.ads/v.gmv*100):0);
+  const tGmv=gmvArr.reduce((s,v)=>s+v,0), tAds=adsArr.reduce((s,v)=>s+v,0);
+  const roas=tAds>0?(tGmv/tAds).toFixed(2):0;
+  const adPct=tGmv>0?(tAds/tGmv*100).toFixed(1):0;
+  document.getElementById('adp-gmv').textContent='฿'+fmtB(tGmv);
+  document.getElementById('adp-ads').textContent='฿'+fmtB(tAds);
+  document.getElementById('adp-roas').textContent=roas+'x';
+  document.getElementById('adp-pct').textContent=adPct+'%';
+  makeAdChart('adpChartOverall',labels,gmvArr,adsArr,pctArr);
+  renderAdpChannel('adpChartFB','adp-sub-fb','fb');
+  renderAdpChannel('adpChartTT','adp-sub-tt','tt');
+  renderAdpChannel('adpChartSH','adp-sub-sh','sh');
+  renderAdpChannel('adpChartLZ','adp-sub-lz','lz');
+  renderAdpSummary();
+}
+
+function renderAdpSummary() {
+  const el=document.getElementById('adp-summary'); if(!el) return;
+  el.innerHTML='<div class="ai-loading">กำลังวิเคราะห์...</div>';
+  setTimeout(()=>{
+    const d=getAdFiltered();
+    if(!d.length){el.textContent='ไม่มีข้อมูลในช่วงที่เลือก';return;}
+    const lines=[];
+    const tGmv=d.reduce((s,r)=>s+r.gmv,0), tAds=d.reduce((s,r)=>s+r.ads,0);
+    const roas=tAds>0?(tGmv/tAds).toFixed(2):0, adPct=tGmv>0?(tAds/tGmv*100).toFixed(1):0;
+    lines.push(`• GMV ฿${fmtB(tGmv)} | ค่าแอด ฿${fmtB(tAds)} | ROAS ${roas}x | %ค่าแอด ${adPct}%`);
+    lines.push(parseFloat(roas)>=5?`• 💚 ROAS ${roas}x — ดีมาก`:parseFloat(roas)>=3?`• 🟡 ROAS ${roas}x — พอใช้ ควรเพิ่ม efficiency`:`• 🔴 ROAS ${roas}x — ต่ำ ค่าแอดสูงเกินไป`);
+    lines.push(parseFloat(adPct)<15?`• 💚 %ค่าแอด ${adPct}% — ดี (ต่ำกว่า 15%)`:parseFloat(adPct)<25?`• 🟡 %ค่าแอด ${adPct}% — พอรับได้ ระวังอย่าเกิน 25%`:`• 🔴 %ค่าแอด ${adPct}% — สูงเกินไป`);
+    const chMap={};
+    d.forEach(r=>{if(!chMap[r.channel])chMap[r.channel]={gmv:0,ads:0};chMap[r.channel].gmv+=r.gmv;chMap[r.channel].ads+=r.ads;});
+    const chArr=Object.entries(chMap).filter(([,v])=>v.gmv>0).map(([k,v])=>({k,gmv:v.gmv,roas:v.ads>0?v.gmv/v.ads:0}));
+    if(chArr.length){
+      const bestG=chArr.sort((a,b)=>b.gmv-a.gmv)[0];
+      const bestR=chArr.sort((a,b)=>b.roas-a.roas)[0];
+      lines.push(`• ช่องทาง GMV สูงสุด: ${bestG.k} (฿${fmtB(bestG.gmv)})`);
+      lines.push(`• ช่องทาง ROAS ดีสุด: ${bestR.k} (${bestR.roas.toFixed(2)}x)`);
+    }
+    el.textContent=lines.join('\n');
+  },300);
 }
 
 
