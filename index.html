@@ -1134,8 +1134,8 @@
             <div class="section-title">🛍️ Shopee</div>
             <select id="adp-sel-sh" onchange="renderAdpChannel('adpChartSH','adp-sub-sh','sh')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:5px;font-size:11px;">
               <option value="all">รวม 2 ร้าน</option>
-              <option value="Shopee24Hr">Shopee 24Hr</option>
-              <option value="ShopeeMall">Shopee Mall</option>
+              <option value="Shopee 24hr">Shopee 24hr</option>
+              <option value="Shopee mall">Shopee mall</option>
             </select>
           </div>
           <div class="kpi-sub" id="adp-sub-sh" style="margin-bottom:10px;">—</div>
@@ -1146,8 +1146,8 @@
             <div class="section-title">🟠 Lazada</div>
             <select id="adp-sel-lz" onchange="renderAdpChannel('adpChartLZ','adp-sub-lz','lz')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:5px;font-size:11px;">
               <option value="all">รวม 2 ร้าน</option>
-              <option value="Lazada24Hr">Lazada 24Hr</option>
-              <option value="LazadaMall">Lazada Mall</option>
+              <option value="Lazada 24hr">Lazada 24hr</option>
+              <option value="Lazada mall">Lazada mall</option>
             </select>
           </div>
           <div class="kpi-sub" id="adp-sub-lz" style="margin-bottom:10px;">—</div>
@@ -2830,7 +2830,7 @@ function makeAdChart(id, labels, gmvArr, adsArr, pctArr) {
     data:{labels,datasets:[
       {type:'bar',label:'GMV',data:gmvArr,backgroundColor:'rgba(96,165,250,0.65)',borderColor:'#60a5fa',borderWidth:1,borderRadius:3,yAxisID:'y'},
       {type:'bar',label:'ค่าแอด',data:adsArr,backgroundColor:'rgba(248,113,113,0.55)',borderColor:'#f87171',borderWidth:1,borderRadius:3,yAxisID:'y'},
-      {type:'line',label:'%ค่าแอด',data:pctArr,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',borderWidth:2,pointRadius:labels.length>60?0:3,tension:0.3,yAxisID:'y2'}
+      {type:'line',label:'%ค่าแอด',data:pctArr,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',borderWidth:2,pointRadius:labels.length>31?0:4,pointBackgroundColor:'#f87171',tension:0.3,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
@@ -2840,7 +2840,26 @@ function makeAdChart(id, labels, gmvArr, adsArr, pctArr) {
       scales:{
         x:{ticks:{color:'#5a5a72',font:{family:'Sarabun',size:10}},grid:{color:'rgba(42,42,58,0.5)'}},
         y:{position:'left',ticks:{color:'#5a5a72',font:{size:10},callback:v=>fmtB(v)},grid:{color:'rgba(42,42,58,0.5)'}},
-        y2:{position:'right',ticks:{color:'#f87171',font:{size:10},callback:v=>v.toFixed(0)+'%'},grid:{display:false}}
+        y2:{position:'right',ticks:{color:'#f87171',font:{size:10,weight:'600'},callback:v=>v.toFixed(0)+'%'},grid:{display:false}}
+      },
+      animation:{onComplete: function(){
+        // Draw % labels on line points if not too many
+        if(labels.length > 31) return;
+        const chart = this;
+        const ds = chart.data.datasets[2];
+        if(!ds) return;
+        const meta = chart.getDatasetMeta(2);
+        const ctx2 = chart.ctx;
+        ctx2.save();
+        ctx2.font = '9px IBM Plex Mono';
+        ctx2.fillStyle = '#f87171';
+        ctx2.textAlign = 'center';
+        meta.data.forEach((pt, i) => {
+          const val = ds.data[i];
+          if(val != null) ctx2.fillText(val.toFixed(0)+'%', pt.x, pt.y - 8);
+        });
+        ctx2.restore();
+      }
       }
     }
   });
@@ -2856,11 +2875,17 @@ function setAdpView(v, btn) {
 function renderAdpChannel(chartId, subId, ch) {
   const d = getAdFiltered();
   let filtered;
-  if(ch==='fb') filtered=d.filter(r=>r.channel==='Online'||r.channel.toLowerCase().includes('facebook'));
-  else if(ch==='tt') filtered=d.filter(r=>r.channel.toLowerCase().includes('tiktok'));
-  else if(ch==='sh'){const sel=document.getElementById('adp-sel-sh')?.value||'all';filtered=d.filter(r=>sel==='all'?r.channel.toLowerCase().includes('shopee'):r.channel===sel);}
-  else if(ch==='lz'){const sel=document.getElementById('adp-sel-lz')?.value||'all';filtered=d.filter(r=>sel==='all'?r.channel.toLowerCase().includes('lazada'):r.channel===sel);}
-  else filtered=d;
+  if(ch==='fb') filtered=d.filter(r=>r.channel==='Facebook'||r.channel==='Facebook AWA'||r.channel==='Online');
+  else if(ch==='tt') filtered=d.filter(r=>r.channel==='Tiktok');
+  else if(ch==='sh'){
+    const sel=document.getElementById('adp-sel-sh')?.value||'all';
+    if(sel==='all') filtered=d.filter(r=>r.channel==='Shopee mall'||r.channel==='Shopee 24hr');
+    else filtered=d.filter(r=>r.channel===sel);
+  } else if(ch==='lz'){
+    const sel=document.getElementById('adp-sel-lz')?.value||'all';
+    if(sel==='all') filtered=d.filter(r=>r.channel==='Lazada mall'||r.channel==='Lazada 24hr');
+    else filtered=d.filter(r=>r.channel===sel);
+  } else filtered=d;
   const a=aggAd(filtered,adView);
   const labels=a.map(([k])=>adLabel(k));
   const gmvArr=a.map(([,v])=>v.gmv), adsArr=a.map(([,v])=>v.ads);
