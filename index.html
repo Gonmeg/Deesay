@@ -1366,6 +1366,8 @@ function applyFilters() {
   // If navigating to skurev page, re-fetch SKU data for new date range
   if (currentPage === 'skurev') {
     loadSkuDataAndRender(from, to, ch, sub);
+  } else if (currentPage === 'adperf') {
+    renderAdpAll();
   } else {
     renderCurrentPage();
   }
