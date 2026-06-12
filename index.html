@@ -1430,10 +1430,10 @@ function showPage(page) {
   document.getElementById('pageTitle').textContent = pageTitles[page];
   currentPage = page;
 
-  // Lock channel filter on skuanalysis page
+  // Lock channel filter on skuanalysis and adperf pages
   const chFilter = document.getElementById('filterChannel');
   const subFilter = document.getElementById('subChannelGroup');
-  if (page === 'skuanalysis') {
+  if (page === 'skuanalysis' || page === 'adperf') {
     if (chFilter) { chFilter.value = ''; chFilter.disabled = true; chFilter.style.opacity = '0.35'; }
     if (subFilter) { subFilter.style.opacity = '0.35'; subFilter.style.pointerEvents = 'none'; }
   } else {
