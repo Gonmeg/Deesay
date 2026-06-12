@@ -421,6 +421,12 @@
     border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
   }
 
+  /* TOGGLE GROUP */
+  .toggle-group { display:flex; gap:2px; background:var(--bg3); border-radius:6px; padding:3px; border:1px solid var(--border); }
+  .toggle-btn { padding:5px 14px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:var(--text3); font-family:'Sarabun',sans-serif; transition:all 0.15s; }
+  .toggle-btn:hover { color:var(--text); background:rgba(255,255,255,0.05); }
+  .toggle-btn.active { background:var(--accent); color:#0a0a0f; }
+
   /* SKU TREND SELECTOR */
   .sku-chip {
     padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
@@ -1097,7 +1103,7 @@
       <!-- View toggle -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
         <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">ช่วงเวลา:</span>
-        <div class="toggle-group" style="display:flex;gap:2px;background:var(--bg3);border-radius:6px;padding:3px;">
+        <div class="toggle-group">
           <button class="toggle-btn" id="adp-yr" onclick="setAdpView('year',this)">ทั้งปี</button>
           <button class="toggle-btn active" id="adp-mo" onclick="setAdpView('month',this)">รายเดือน</button>
           <button class="toggle-btn" id="adp-dy" onclick="setAdpView('day',this)">รายวัน</button>
@@ -2826,40 +2832,50 @@ function adLabel(k) {
 function makeAdChart(id, labels, gmvArr, adsArr, pctArr) {
   if(charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id); if(!ctx) return;
+
+  // Custom plugin: draw % labels on line points persistently
+  const pctLabelPlugin = {
+    id: 'pctLabels',
+    afterDraw(chart) {
+      if(chart.data.labels.length > 31) return;
+      const ds = chart.data.datasets[2]; if(!ds) return;
+      const meta = chart.getDatasetMeta(2);
+      const c = chart.ctx;
+      c.save();
+      c.font = 'bold 11px IBM Plex Mono';
+      c.fillStyle = '#f87171';
+      c.textAlign = 'center';
+      c.shadowColor = 'rgba(0,0,0,0.9)';
+      c.shadowBlur = 4;
+      meta.data.forEach((pt, i) => {
+        const val = ds.data[i];
+        if(val != null) c.fillText(val.toFixed(0)+'%', pt.x, pt.y - 10);
+      });
+      c.restore();
+    }
+  };
+
   charts[id] = new Chart(ctx, {
     data:{labels,datasets:[
       {type:'bar',label:'GMV',data:gmvArr,backgroundColor:'rgba(96,165,250,0.65)',borderColor:'#60a5fa',borderWidth:1,borderRadius:3,yAxisID:'y'},
       {type:'bar',label:'ค่าแอด',data:adsArr,backgroundColor:'rgba(248,113,113,0.55)',borderColor:'#f87171',borderWidth:1,borderRadius:3,yAxisID:'y'},
       {type:'line',label:'%ค่าแอด',data:pctArr,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',borderWidth:2,pointRadius:labels.length>31?0:4,pointBackgroundColor:'#f87171',tension:0.3,yAxisID:'y2'}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
-        if(ctx.datasetIndex===2)return ` %ค่าแอด: ${ctx.raw.toFixed(1)}%`;
-        return ` ${ctx.dataset.label}: ฿${fmt(ctx.raw)}`;
-      }}}},
+    plugins:[pctLabelPlugin],
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>{
+          if(ctx.datasetIndex===2)return ` %ค่าแอด: ${ctx.raw.toFixed(1)}%`;
+          return ` ${ctx.dataset.label}: ฿${fmt(ctx.raw)}`;
+        }}}
+      },
       scales:{
         x:{ticks:{color:'#5a5a72',font:{family:'Sarabun',size:10}},grid:{color:'rgba(42,42,58,0.5)'}},
         y:{position:'left',ticks:{color:'#5a5a72',font:{size:10},callback:v=>fmtB(v)},grid:{color:'rgba(42,42,58,0.5)'}},
         y2:{position:'right',ticks:{color:'#f87171',font:{size:10,weight:'600'},callback:v=>v.toFixed(0)+'%'},grid:{display:false}}
-      },
-      animation:{onComplete: function(){
-        // Draw % labels on line points if not too many
-        if(labels.length > 31) return;
-        const chart = this;
-        const ds = chart.data.datasets[2];
-        if(!ds) return;
-        const meta = chart.getDatasetMeta(2);
-        const ctx2 = chart.ctx;
-        ctx2.save();
-        ctx2.font = '9px IBM Plex Mono';
-        ctx2.fillStyle = '#f87171';
-        ctx2.textAlign = 'center';
-        meta.data.forEach((pt, i) => {
-          const val = ds.data[i];
-          if(val != null) ctx2.fillText(val.toFixed(0)+'%', pt.x, pt.y - 8);
-        });
-        ctx2.restore();
-      }
       }
     }
   });
